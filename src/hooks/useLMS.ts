@@ -540,3 +540,29 @@ export function useSendNotification() {
     },
   });
 }
+
+// Profiles hook for user management
+export interface Profile {
+  id: string;
+  full_name: string | null;
+  email: string | null;
+  role: string;
+  department: string | null;
+  phone: string | null;
+  avatar_url: string | null;
+  created_at: string;
+}
+
+export function useProfiles() {
+  return useQuery({
+    queryKey: ['profiles'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return data as Profile[];
+    },
+  });
+}
