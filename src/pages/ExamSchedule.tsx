@@ -41,6 +41,7 @@ export default function ExamSchedule() {
     room: '',
     department: '',
     semester: '',
+    regulation: '',
     max_marks: 100,
   });
 
@@ -48,6 +49,7 @@ export default function ExamSchedule() {
     e.preventDefault();
     await addExam.mutateAsync({
       ...formData,
+      regulation: formData.regulation || null,
       created_by: user?.id || '',
     });
     setDialogOpen(false);
@@ -60,6 +62,7 @@ export default function ExamSchedule() {
       room: '',
       department: '',
       semester: '',
+      regulation: '',
       max_marks: 100,
     });
   };
