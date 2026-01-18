@@ -19,11 +19,11 @@ export default function WelcomeCard({ userName, role, greeting }: WelcomeCardPro
   const getRoleMessage = () => {
     switch (role) {
       case 'student':
-        return "Ready to learn something new today?";
+        return "Ready to ace your B.Tech semester?";
       case 'teacher':
-        return "Inspire your students today!";
+        return "Empower future engineers today!";
       case 'admin':
-        return "Here's your system overview.";
+        return "Here's your college overview.";
       default:
         return "Welcome back!";
     }
