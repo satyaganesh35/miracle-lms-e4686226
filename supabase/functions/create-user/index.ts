@@ -73,6 +73,18 @@ Deno.serve(async (req) => {
       auth: { autoRefreshToken: false, persistSession: false },
     });
 
+    // Check if user already exists in auth
+    const { data: existingUsers } = await adminClient.auth.admin.listUsers();
+    const existingUser = existingUsers?.users?.find(u => u.email === email);
+    
+    if (existingUser) {
+      console.error('User with this email already exists:', email);
+      return new Response(
+        JSON.stringify({ error: 'A user with this email already exists' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     // Create the user with admin API
     const { data: authData, error: authError } = await adminClient.auth.admin.createUser({
       email,
@@ -90,6 +102,45 @@ Deno.serve(async (req) => {
     }
 
     console.log('Auth user created:', authData.user.id);
+
+    // Check if profile already exists (from a previous partial creation)
+    const { data: existingProfile } = await adminClient
+      .from('profiles')
+      .select('id')
+      .eq('id', authData.user.id)
+      .single();
+
+    if (existingProfile) {
+      // Update existing profile
+      const { data: profileData, error: profileUpdateError } = await adminClient
+        .from('profiles')
+        .update({
+          full_name,
+          email,
+          role,
+          department: department || null,
+          semester: semester || null,
+          regulation: regulation || null,
+          phone: phone || null,
+        })
+        .eq('id', authData.user.id)
+        .select()
+        .single();
+
+      if (profileUpdateError) {
+        console.error('Failed to update profile:', profileUpdateError);
+        return new Response(
+          JSON.stringify({ error: 'Failed to update user profile' }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      console.log('Profile updated successfully:', profileData.id);
+      return new Response(
+        JSON.stringify({ user: profileData }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     // Create the profile
     const { data: profileData, error: profileInsertError } = await adminClient
