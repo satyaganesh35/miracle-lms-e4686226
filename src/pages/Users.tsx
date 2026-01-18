@@ -19,11 +19,15 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
+import AddUserDialog from '@/components/users/AddUserDialog';
+import DeleteUserDialog from '@/components/users/DeleteUserDialog';
 
 export default function UsersManagement() {
   const { userRole } = useAuth();
   const { data: profiles, isLoading } = useProfiles();
   const [searchQuery, setSearchQuery] = useState('');
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<{ id: string; name: string } | null>(null);
 
   // Filter profiles by role
   const students = useMemo(() => 
@@ -80,10 +84,7 @@ export default function UsersManagement() {
             <h1 className="text-2xl font-display font-bold">Manage Users</h1>
             <p className="text-muted-foreground">Add, edit, and manage all users in the system</p>
           </div>
-          <Button variant="hero">
-            <UserPlus className="h-4 w-4" />
-            Add New User
-          </Button>
+          <AddUserDialog />
         </div>
 
         {/* Stats */}
@@ -218,7 +219,13 @@ export default function UsersManagement() {
                                 <Mail className="h-4 w-4 mr-2" />
                                 Send Email
                               </DropdownMenuItem>
-                              <DropdownMenuItem className="text-destructive">
+                              <DropdownMenuItem 
+                                className="text-destructive"
+                                onClick={() => {
+                                  setSelectedUser({ id: student.id, name: student.full_name || 'User' });
+                                  setDeleteDialogOpen(true);
+                                }}
+                              >
                                 <Trash2 className="h-4 w-4 mr-2" />
                                 Delete
                               </DropdownMenuItem>
@@ -276,7 +283,13 @@ export default function UsersManagement() {
                                 <Mail className="h-4 w-4 mr-2" />
                                 Send Email
                               </DropdownMenuItem>
-                              <DropdownMenuItem className="text-destructive">
+                              <DropdownMenuItem 
+                                className="text-destructive"
+                                onClick={() => {
+                                  setSelectedUser({ id: teacher.id, name: teacher.full_name || 'User' });
+                                  setDeleteDialogOpen(true);
+                                }}
+                              >
                                 <Trash2 className="h-4 w-4 mr-2" />
                                 Delete
                               </DropdownMenuItem>
@@ -348,6 +361,16 @@ export default function UsersManagement() {
             </Card>
           </TabsContent>
         </Tabs>
+
+        {/* Delete User Dialog */}
+        {selectedUser && (
+          <DeleteUserDialog
+            userId={selectedUser.id}
+            userName={selectedUser.name}
+            open={deleteDialogOpen}
+            onOpenChange={setDeleteDialogOpen}
+          />
+        )}
       </div>
     </DashboardLayout>
   );

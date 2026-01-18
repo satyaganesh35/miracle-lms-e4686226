@@ -322,7 +322,6 @@ export function useFees(studentId?: string) {
       if (error) throw error;
       return data as Fee[];
     },
-    enabled: !!studentId,
   });
 }
 
@@ -563,6 +562,90 @@ export function useProfiles() {
         .order('created_at', { ascending: false });
       if (error) throw error;
       return data as Profile[];
+    },
+  });
+}
+
+// Fee mutations
+export function useAddFee() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async (fee: {
+      student_id: string;
+      description: string;
+      amount: number;
+      due_date: string;
+      status: 'pending' | 'paid' | 'overdue';
+    }) => {
+      const { data, error } = await supabase
+        .from('fees')
+        .insert({
+          student_id: fee.student_id,
+          description: fee.description,
+          amount: fee.amount,
+          due_date: fee.due_date,
+          status: fee.status,
+          paid_date: fee.status === 'paid' ? new Date().toISOString() : null,
+        })
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['fees'] });
+    },
+  });
+}
+
+// User management mutations
+export function useCreateUser() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async (user: {
+      full_name: string;
+      email: string;
+      role: 'student' | 'teacher' | 'admin';
+      department?: string;
+      phone?: string;
+    }) => {
+      // Create a profile directly (for admin-created users)
+      const { data, error } = await supabase
+        .from('profiles')
+        .insert({
+          id: crypto.randomUUID(),
+          full_name: user.full_name,
+          email: user.email,
+          role: user.role,
+          department: user.department || null,
+          phone: user.phone || null,
+        })
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['profiles'] });
+    },
+  });
+}
+
+export function useDeleteUser() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async (userId: string) => {
+      const { error } = await supabase
+        .from('profiles')
+        .delete()
+        .eq('id', userId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['profiles'] });
     },
   });
 }
