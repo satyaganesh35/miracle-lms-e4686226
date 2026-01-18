@@ -13,12 +13,14 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
+import AddFeeDialog from '@/components/fees/AddFeeDialog';
 
 export default function Fees() {
   const { user, userRole } = useAuth();
   const isAdmin = userRole === 'admin';
   
-  const { data: fees, isLoading } = useFees(user?.id);
+  // For admin, fetch all fees; for students, fetch their own fees
+  const { data: fees, isLoading } = useFees(isAdmin ? undefined : user?.id);
 
   // Calculate fee statistics
   const feeStats = useMemo(() => {
@@ -69,10 +71,13 @@ export default function Fees() {
               <h1 className="text-2xl font-display font-bold">Fee Management</h1>
               <p className="text-muted-foreground">Track and manage student fee payments</p>
             </div>
-            <Button variant="hero">
-              <Download className="h-4 w-4" />
-              Export Report
-            </Button>
+            <div className="flex gap-2">
+              <AddFeeDialog />
+              <Button variant="outline">
+                <Download className="h-4 w-4" />
+                Export Report
+              </Button>
+            </div>
           </div>
 
           {/* Stats */}
