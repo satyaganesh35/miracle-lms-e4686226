@@ -14,31 +14,31 @@ import {
 import { cn } from '@/lib/utils';
 
 const studentGrades = {
-  gpa: 3.7,
-  cgpa: 3.65,
+  gpa: 8.7,
+  cgpa: 8.45,
   rank: 12,
   totalStudents: 156,
   subjects: [
-    { name: 'Mathematics', grade: 'A', marks: 92, maxMarks: 100, credits: 4 },
-    { name: 'Physics', grade: 'A-', marks: 88, maxMarks: 100, credits: 4 },
-    { name: 'Chemistry', grade: 'B+', marks: 82, maxMarks: 100, credits: 3 },
-    { name: 'Computer Science', grade: 'A+', marks: 96, maxMarks: 100, credits: 4 },
-    { name: 'English', grade: 'A', marks: 90, maxMarks: 100, credits: 2 },
+    { name: 'Data Structures & Algorithms', grade: 'A', marks: 92, maxMarks: 100, credits: 4 },
+    { name: 'Database Management Systems', grade: 'A-', marks: 88, maxMarks: 100, credits: 4 },
+    { name: 'Operating Systems', grade: 'B+', marks: 82, maxMarks: 100, credits: 3 },
+    { name: 'Computer Networks', grade: 'A+', marks: 96, maxMarks: 100, credits: 4 },
+    { name: 'Software Engineering', grade: 'A', marks: 90, maxMarks: 100, credits: 3 },
   ],
   exams: [
-    { name: 'Mid-Term Exam', subjects: [
-      { name: 'Mathematics', marks: 45, maxMarks: 50 },
-      { name: 'Physics', marks: 42, maxMarks: 50 },
-      { name: 'Chemistry', marks: 38, maxMarks: 50 },
+    { name: 'Mid-Semester Exam', subjects: [
+      { name: 'Data Structures & Algorithms', marks: 45, maxMarks: 50 },
+      { name: 'Database Management Systems', marks: 42, maxMarks: 50 },
+      { name: 'Operating Systems', marks: 38, maxMarks: 50 },
     ]},
     { name: 'Internal Assessment 1', subjects: [
-      { name: 'Mathematics', marks: 23, maxMarks: 25 },
-      { name: 'Physics', marks: 22, maxMarks: 25 },
-      { name: 'Chemistry', marks: 20, maxMarks: 25 },
+      { name: 'Data Structures & Algorithms', marks: 23, maxMarks: 25 },
+      { name: 'Database Management Systems', marks: 22, maxMarks: 25 },
+      { name: 'Operating Systems', marks: 20, maxMarks: 25 },
     ]},
-    { name: 'Quiz 1', subjects: [
-      { name: 'Computer Science', marks: 24, maxMarks: 25 },
-      { name: 'English', marks: 22, maxMarks: 25 },
+    { name: 'Lab Practical', subjects: [
+      { name: 'Computer Networks Lab', marks: 24, maxMarks: 25 },
+      { name: 'DBMS Lab', marks: 22, maxMarks: 25 },
     ]},
   ],
 };
@@ -86,9 +86,9 @@ export default function Grades() {
                   <SelectValue placeholder="Select assignment" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="assignment1">Calculus Problem Set 5</SelectItem>
-                  <SelectItem value="assignment2">Physics Lab Report</SelectItem>
-                  <SelectItem value="assignment3">Statistics Quiz</SelectItem>
+                  <SelectItem value="assignment1">DSA Problem Set 5</SelectItem>
+                  <SelectItem value="assignment2">DBMS Lab Report</SelectItem>
+                  <SelectItem value="assignment3">OS Assignment</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -100,11 +100,11 @@ export default function Grades() {
               <div className="grid gap-6 md:grid-cols-4">
                 <div>
                   <p className="text-sm text-muted-foreground">Assignment</p>
-                  <p className="font-semibold">Calculus Problem Set 5</p>
+                  <p className="font-semibold">DSA Problem Set 5</p>
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Class</p>
-                  <p className="font-semibold">Class 10-A</p>
+                  <p className="text-sm text-muted-foreground">Section</p>
+                  <p className="font-semibold">CSE 2nd Year - Sec A</p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Max Marks</p>
@@ -180,7 +180,7 @@ export default function Grades() {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground">Current GPA</p>
+                  <p className="text-sm text-muted-foreground">Current SGPA</p>
                   <p className="text-3xl font-display font-bold">{studentGrades.gpa}</p>
                 </div>
                 <div className="p-3 rounded-xl bg-primary/10">

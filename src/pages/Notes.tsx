@@ -13,22 +13,22 @@ import {
 import { cn } from '@/lib/utils';
 
 const materials = [
-  { id: 1, title: 'Calculus Notes - Chapter 5', subject: 'Mathematics', type: 'pdf', size: '2.4 MB', uploadedBy: 'Dr. Sharma', date: '2024-01-15' },
-  { id: 2, title: 'Physics Formulas Cheat Sheet', subject: 'Physics', type: 'pdf', size: '1.1 MB', uploadedBy: 'Prof. Kumar', date: '2024-01-14' },
-  { id: 3, title: 'Organic Chemistry Reactions', subject: 'Chemistry', type: 'pdf', size: '3.2 MB', uploadedBy: 'Dr. Patel', date: '2024-01-12' },
-  { id: 4, title: 'Python Basics Tutorial', subject: 'Computer Science', type: 'video', size: '45 min', uploadedBy: 'Mr. Ravi', date: '2024-01-10', link: 'https://youtube.com/watch?v=example' },
-  { id: 5, title: 'Data Structures Explained', subject: 'Computer Science', type: 'video', size: '1h 20min', uploadedBy: 'Mr. Ravi', date: '2024-01-08', link: 'https://youtube.com/watch?v=example2' },
-  { id: 6, title: 'English Grammar Reference', subject: 'English', type: 'pdf', size: '1.8 MB', uploadedBy: 'Mrs. Reddy', date: '2024-01-05' },
+  { id: 1, title: 'DSA Notes - Trees & Graphs', subject: 'Data Structures', type: 'pdf', size: '2.4 MB', uploadedBy: 'Dr. Venkat', date: '2026-01-15' },
+  { id: 2, title: 'DBMS Normalization Cheat Sheet', subject: 'Database Systems', type: 'pdf', size: '1.1 MB', uploadedBy: 'Prof. Ramesh', date: '2026-01-14' },
+  { id: 3, title: 'OS Memory Management', subject: 'Operating Systems', type: 'pdf', size: '3.2 MB', uploadedBy: 'Dr. Suresh', date: '2026-01-12' },
+  { id: 4, title: 'TCP/IP Protocol Tutorial', subject: 'Computer Networks', type: 'video', size: '45 min', uploadedBy: 'Dr. Priya', date: '2026-01-10', link: 'https://youtube.com/watch?v=example' },
+  { id: 5, title: 'SDLC Models Explained', subject: 'Software Engineering', type: 'video', size: '1h 20min', uploadedBy: 'Prof. Lakshmi', date: '2026-01-08', link: 'https://youtube.com/watch?v=example2' },
+  { id: 6, title: 'SQL Commands Reference', subject: 'Database Systems', type: 'pdf', size: '1.8 MB', uploadedBy: 'Prof. Ramesh', date: '2026-01-05' },
 ];
 
 const referenceBooks = [
-  { id: 1, title: 'Higher Engineering Mathematics', author: 'B.S. Grewal', subject: 'Mathematics', isbn: '978-8174091956' },
-  { id: 2, title: 'Concepts of Physics', author: 'H.C. Verma', subject: 'Physics', isbn: '978-8177091878' },
-  { id: 3, title: 'Organic Chemistry', author: 'Morrison & Boyd', subject: 'Chemistry', isbn: '978-0136436669' },
-  { id: 4, title: 'Introduction to Algorithms', author: 'Cormen et al.', subject: 'Computer Science', isbn: '978-0262033848' },
+  { id: 1, title: 'Introduction to Algorithms', author: 'Cormen, Leiserson, Rivest, Stein', subject: 'Data Structures', isbn: '978-0262033848' },
+  { id: 2, title: 'Database System Concepts', author: 'Silberschatz, Korth, Sudarshan', subject: 'Database Systems', isbn: '978-0078022159' },
+  { id: 3, title: 'Operating System Concepts', author: 'Galvin, Gagne, Silberschatz', subject: 'Operating Systems', isbn: '978-1119800361' },
+  { id: 4, title: 'Computer Networks', author: 'Andrew S. Tanenbaum', subject: 'Computer Networks', isbn: '978-0132126953' },
 ];
 
-const subjects = ['All', 'Mathematics', 'Physics', 'Chemistry', 'Computer Science', 'English'];
+const subjects = ['All', 'Data Structures', 'Database Systems', 'Operating Systems', 'Computer Networks', 'Software Engineering'];
 
 export default function Notes() {
   const { userRole } = useAuth();

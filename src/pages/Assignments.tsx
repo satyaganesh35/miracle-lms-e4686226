@@ -14,18 +14,18 @@ import {
 import { cn } from '@/lib/utils';
 
 const studentAssignments = [
-  { id: 1, title: 'Calculus Problem Set 5', subject: 'Mathematics', dueDate: '2024-01-20', status: 'pending', progress: 60, maxMarks: 100 },
-  { id: 2, title: 'Physics Lab Report - Optics', subject: 'Physics', dueDate: '2024-01-22', status: 'pending', progress: 30, maxMarks: 50 },
-  { id: 3, title: 'Python Data Structures Project', subject: 'Computer Science', dueDate: '2024-01-25', status: 'pending', progress: 0, maxMarks: 100 },
-  { id: 4, title: 'Essay on Climate Change', subject: 'English', dueDate: '2024-01-18', status: 'submitted', progress: 100, maxMarks: 50, marks: 45 },
-  { id: 5, title: 'Organic Chemistry Worksheet', subject: 'Chemistry', dueDate: '2024-01-15', status: 'graded', progress: 100, maxMarks: 50, marks: 42 },
-  { id: 6, title: 'Trigonometry Quiz', subject: 'Mathematics', dueDate: '2024-01-10', status: 'graded', progress: 100, maxMarks: 30, marks: 28 },
+  { id: 1, title: 'DSA Problem Set - Linked Lists', subject: 'Data Structures & Algorithms', dueDate: '2026-01-22', status: 'pending', progress: 60, maxMarks: 100 },
+  { id: 2, title: 'DBMS Lab Report - ER Diagrams', subject: 'Database Management Systems', dueDate: '2026-01-24', status: 'pending', progress: 30, maxMarks: 50 },
+  { id: 3, title: 'OS Process Scheduling Simulation', subject: 'Operating Systems', dueDate: '2026-01-28', status: 'pending', progress: 0, maxMarks: 100 },
+  { id: 4, title: 'Network Protocol Analysis', subject: 'Computer Networks', dueDate: '2026-01-18', status: 'submitted', progress: 100, maxMarks: 50, marks: 45 },
+  { id: 5, title: 'Software Requirements Document', subject: 'Software Engineering', dueDate: '2026-01-15', status: 'graded', progress: 100, maxMarks: 50, marks: 42 },
+  { id: 6, title: 'Binary Search Tree Implementation', subject: 'Data Structures & Algorithms', dueDate: '2026-01-10', status: 'graded', progress: 100, maxMarks: 30, marks: 28 },
 ];
 
 const teacherAssignments = [
-  { id: 1, title: 'Calculus Problem Set 5', class: 'Class 10-A', dueDate: '2024-01-20', totalStudents: 35, submitted: 28, graded: 15 },
-  { id: 2, title: 'Algebra Quiz', class: 'Class 11-B', dueDate: '2024-01-18', totalStudents: 32, submitted: 32, graded: 32 },
-  { id: 3, title: 'Statistics Assignment', class: 'Class 12-A', dueDate: '2024-01-25', totalStudents: 28, submitted: 12, graded: 0 },
+  { id: 1, title: 'DSA Problem Set - Linked Lists', class: 'CSE 2nd Year - Sec A', dueDate: '2026-01-22', totalStudents: 65, submitted: 48, graded: 25 },
+  { id: 2, title: 'SQL Queries Assignment', class: 'CSE 2nd Year - Sec B', dueDate: '2026-01-20', totalStudents: 62, submitted: 62, graded: 62 },
+  { id: 3, title: 'UML Diagrams Project', class: 'CSE 3rd Year - Sec A', dueDate: '2026-01-28', totalStudents: 58, submitted: 22, graded: 0 },
 ];
 
 export default function Assignments() {

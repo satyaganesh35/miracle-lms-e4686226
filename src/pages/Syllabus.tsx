@@ -11,46 +11,46 @@ import { cn } from '@/lib/utils';
 
 const syllabusData = [
   {
-    subject: 'Mathematics',
-    teacher: 'Dr. Sharma',
+    subject: 'Data Structures & Algorithms',
+    teacher: 'Dr. Venkat',
     progress: 65,
     units: [
-      { name: 'Unit 1: Calculus', topics: ['Limits', 'Derivatives', 'Integration'], completed: true },
-      { name: 'Unit 2: Algebra', topics: ['Matrices', 'Determinants', 'Linear Equations'], completed: true },
-      { name: 'Unit 3: Trigonometry', topics: ['Identities', 'Equations', 'Applications'], completed: false },
-      { name: 'Unit 4: Statistics', topics: ['Probability', 'Distributions', 'Hypothesis Testing'], completed: false },
+      { name: 'Unit 1: Arrays & Linked Lists', topics: ['Arrays', 'Singly Linked Lists', 'Doubly Linked Lists', 'Circular Lists'], completed: true },
+      { name: 'Unit 2: Stacks & Queues', topics: ['Stack Operations', 'Queue Types', 'Priority Queues', 'Applications'], completed: true },
+      { name: 'Unit 3: Trees', topics: ['Binary Trees', 'BST', 'AVL Trees', 'B-Trees'], completed: false },
+      { name: 'Unit 4: Graphs', topics: ['Graph Representations', 'BFS', 'DFS', 'Shortest Paths'], completed: false },
     ]
   },
   {
-    subject: 'Physics',
-    teacher: 'Prof. Kumar',
+    subject: 'Database Management Systems',
+    teacher: 'Prof. Ramesh',
     progress: 50,
     units: [
-      { name: 'Unit 1: Mechanics', topics: ['Kinematics', 'Dynamics', 'Work & Energy'], completed: true },
-      { name: 'Unit 2: Thermodynamics', topics: ['Laws of Thermodynamics', 'Heat Transfer'], completed: true },
-      { name: 'Unit 3: Optics', topics: ['Reflection', 'Refraction', 'Interference'], completed: false },
-      { name: 'Unit 4: Electromagnetism', topics: ['Electric Fields', 'Magnetic Fields', 'Induction'], completed: false },
+      { name: 'Unit 1: Introduction to DBMS', topics: ['Database Concepts', 'ER Diagrams', 'Relational Model'], completed: true },
+      { name: 'Unit 2: SQL', topics: ['DDL', 'DML', 'Joins', 'Subqueries'], completed: true },
+      { name: 'Unit 3: Normalization', topics: ['1NF', '2NF', '3NF', 'BCNF'], completed: false },
+      { name: 'Unit 4: Transactions', topics: ['ACID Properties', 'Concurrency Control', 'Recovery'], completed: false },
     ]
   },
   {
-    subject: 'Chemistry',
-    teacher: 'Dr. Patel',
+    subject: 'Operating Systems',
+    teacher: 'Dr. Suresh',
     progress: 40,
     units: [
-      { name: 'Unit 1: Organic Chemistry', topics: ['Hydrocarbons', 'Functional Groups', 'Reactions'], completed: true },
-      { name: 'Unit 2: Inorganic Chemistry', topics: ['Periodic Table', 'Chemical Bonding', 'Coordination Compounds'], completed: false },
-      { name: 'Unit 3: Physical Chemistry', topics: ['Thermochemistry', 'Electrochemistry', 'Kinetics'], completed: false },
+      { name: 'Unit 1: Process Management', topics: ['Processes', 'Threads', 'CPU Scheduling', 'Synchronization'], completed: true },
+      { name: 'Unit 2: Memory Management', topics: ['Paging', 'Segmentation', 'Virtual Memory'], completed: false },
+      { name: 'Unit 3: File Systems', topics: ['File Organization', 'Directory Structure', 'Allocation Methods'], completed: false },
     ]
   },
   {
-    subject: 'Computer Science',
-    teacher: 'Mr. Ravi',
+    subject: 'Computer Networks',
+    teacher: 'Dr. Priya',
     progress: 75,
     units: [
-      { name: 'Unit 1: Programming Fundamentals', topics: ['Variables', 'Control Flow', 'Functions'], completed: true },
-      { name: 'Unit 2: Data Structures', topics: ['Arrays', 'Linked Lists', 'Trees'], completed: true },
-      { name: 'Unit 3: Algorithms', topics: ['Sorting', 'Searching', 'Graph Algorithms'], completed: true },
-      { name: 'Unit 4: Database Systems', topics: ['SQL', 'Normalization', 'Transactions'], completed: false },
+      { name: 'Unit 1: Network Fundamentals', topics: ['OSI Model', 'TCP/IP', 'Network Topologies'], completed: true },
+      { name: 'Unit 2: Data Link Layer', topics: ['Framing', 'Error Detection', 'Flow Control', 'MAC'], completed: true },
+      { name: 'Unit 3: Network Layer', topics: ['IP Addressing', 'Routing Algorithms', 'Subnetting'], completed: true },
+      { name: 'Unit 4: Transport Layer', topics: ['TCP', 'UDP', 'Congestion Control'], completed: false },
     ]
   },
 ];
@@ -58,7 +58,7 @@ const syllabusData = [
 export default function Syllabus() {
   const { userRole } = useAuth();
   const isTeacher = userRole === 'teacher';
-  const [expandedSubjects, setExpandedSubjects] = useState<string[]>(['Mathematics']);
+  const [expandedSubjects, setExpandedSubjects] = useState<string[]>(['Data Structures & Algorithms']);
 
   const toggleSubject = (subject: string) => {
     setExpandedSubjects(prev => 
