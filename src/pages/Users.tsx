@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useAuth } from '@/hooks/useAuth';
+import { useProfiles } from '@/hooks/useLMS';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -9,7 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { 
   Users, UserPlus, Search, Filter, MoreVertical, 
-  GraduationCap, BookOpen, Shield, Edit, Trash2, Mail
+  GraduationCap, BookOpen, Shield, Edit, Trash2, Mail, Loader2
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -19,48 +20,56 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 
-const usersData = {
-  students: [
-    { id: 1, name: 'Rahul Kumar', email: 'rahul@example.com', class: '10-A', rollNo: '101', status: 'active' },
-    { id: 2, name: 'Priya Sharma', email: 'priya@example.com', class: '10-A', rollNo: '102', status: 'active' },
-    { id: 3, name: 'Amit Patel', email: 'amit@example.com', class: '10-B', rollNo: '103', status: 'active' },
-    { id: 4, name: 'Sneha Reddy', email: 'sneha@example.com', class: '11-A', rollNo: '104', status: 'inactive' },
-    { id: 5, name: 'Vikram Singh', email: 'vikram@example.com', class: '11-B', rollNo: '105', status: 'active' },
-  ],
-  teachers: [
-    { id: 1, name: 'Dr. Sharma', email: 'sharma@example.com', department: 'Mathematics', subjects: ['Calculus', 'Algebra'], status: 'active' },
-    { id: 2, name: 'Prof. Kumar', email: 'kumar@example.com', department: 'Physics', subjects: ['Mechanics', 'Optics'], status: 'active' },
-    { id: 3, name: 'Dr. Patel', email: 'patel@example.com', department: 'Chemistry', subjects: ['Organic', 'Inorganic'], status: 'active' },
-    { id: 4, name: 'Mrs. Reddy', email: 'reddy@example.com', department: 'English', subjects: ['Grammar', 'Literature'], status: 'active' },
-    { id: 5, name: 'Mr. Ravi', email: 'ravi@example.com', department: 'Computer Science', subjects: ['Programming', 'Data Structures'], status: 'on-leave' },
-  ],
-  admins: [
-    { id: 1, name: 'Admin User', email: 'admin@miracle.edu', role: 'Super Admin', status: 'active' },
-    { id: 2, name: 'Office Staff', email: 'office@miracle.edu', role: 'Staff', status: 'active' },
-  ],
-};
-
 export default function UsersManagement() {
   const { userRole } = useAuth();
+  const { data: profiles, isLoading } = useProfiles();
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Filter profiles by role
+  const students = useMemo(() => 
+    profiles?.filter(p => p.role === 'student') || [], 
+    [profiles]
+  );
+  const teachers = useMemo(() => 
+    profiles?.filter(p => p.role === 'teacher') || [], 
+    [profiles]
+  );
+  const admins = useMemo(() => 
+    profiles?.filter(p => p.role === 'admin') || [], 
+    [profiles]
+  );
+
+  // Filter by search query
+  const filterBySearch = (list: typeof profiles) => {
+    if (!searchQuery) return list;
+    return list?.filter(p => 
+      p.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      p.email?.toLowerCase().includes(searchQuery.toLowerCase())
+    ) || [];
+  };
+
+  const filteredStudents = filterBySearch(students);
+  const filteredTeachers = filterBySearch(teachers);
+  const filteredAdmins = filterBySearch(admins);
 
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'active': return <Badge className="bg-success/10 text-success border-success/30">Active</Badge>;
       case 'inactive': return <Badge className="bg-muted text-muted-foreground">Inactive</Badge>;
       case 'on-leave': return <Badge className="bg-warning/10 text-warning border-warning/30">On Leave</Badge>;
-      default: return null;
+      default: return <Badge className="bg-success/10 text-success border-success/30">Active</Badge>;
     }
   };
 
-  const getRoleIcon = (role: string) => {
-    switch (role) {
-      case 'student': return <GraduationCap className="h-4 w-4" />;
-      case 'teacher': return <BookOpen className="h-4 w-4" />;
-      case 'admin': return <Shield className="h-4 w-4" />;
-      default: return null;
-    }
-  };
+  if (isLoading) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout>
@@ -86,7 +95,7 @@ export default function UsersManagement() {
                   <Users className="h-5 w-5 text-primary" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold">2,535</p>
+                  <p className="text-2xl font-bold">{profiles?.length || 0}</p>
                   <p className="text-sm text-muted-foreground">Total Users</p>
                 </div>
               </div>
@@ -99,7 +108,7 @@ export default function UsersManagement() {
                   <GraduationCap className="h-5 w-5 text-info" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-info">2,450</p>
+                  <p className="text-2xl font-bold text-info">{students.length}</p>
                   <p className="text-sm text-muted-foreground">Students</p>
                 </div>
               </div>
@@ -112,8 +121,8 @@ export default function UsersManagement() {
                   <BookOpen className="h-5 w-5 text-success" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-success">85</p>
-                  <p className="text-sm text-muted-foreground">Teachers</p>
+                  <p className="text-2xl font-bold text-success">{teachers.length}</p>
+                  <p className="text-sm text-muted-foreground">Faculty</p>
                 </div>
               </div>
             </CardContent>
@@ -125,7 +134,7 @@ export default function UsersManagement() {
                   <Shield className="h-5 w-5 text-warning" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-warning">5</p>
+                  <p className="text-2xl font-bold text-warning">{admins.length}</p>
                   <p className="text-sm text-muted-foreground">Admins</p>
                 </div>
               </div>
@@ -140,7 +149,7 @@ export default function UsersManagement() {
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input 
-                  placeholder="Search users by name, email, or ID..." 
+                  placeholder="Search users by name or email..." 
                   className="pl-9"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
@@ -159,66 +168,72 @@ export default function UsersManagement() {
           <TabsList>
             <TabsTrigger value="students" className="gap-2">
               <GraduationCap className="h-4 w-4" />
-              Students ({usersData.students.length})
+              Students ({filteredStudents.length})
             </TabsTrigger>
             <TabsTrigger value="teachers" className="gap-2">
               <BookOpen className="h-4 w-4" />
-              Teachers ({usersData.teachers.length})
+              Faculty ({filteredTeachers.length})
             </TabsTrigger>
             <TabsTrigger value="admins" className="gap-2">
               <Shield className="h-4 w-4" />
-              Admins ({usersData.admins.length})
+              Admins ({filteredAdmins.length})
             </TabsTrigger>
           </TabsList>
 
           <TabsContent value="students" className="space-y-4">
             <Card className="shadow-card">
               <CardContent className="p-0">
-                <div className="divide-y">
-                  {usersData.students.map((student) => (
-                    <div key={student.id} className="flex items-center justify-between p-4 hover:bg-muted/50 transition-colors">
-                      <div className="flex items-center gap-4">
-                        <Avatar>
-                          <AvatarFallback className="bg-primary/10 text-primary">
-                            {student.name.split(' ').map(n => n[0]).join('')}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <p className="font-medium">{student.name}</p>
-                          <p className="text-sm text-muted-foreground">{student.email}</p>
+                {filteredStudents.length > 0 ? (
+                  <div className="divide-y">
+                    {filteredStudents.map((student) => (
+                      <div key={student.id} className="flex items-center justify-between p-4 hover:bg-muted/50 transition-colors">
+                        <div className="flex items-center gap-4">
+                          <Avatar>
+                            <AvatarFallback className="bg-primary/10 text-primary">
+                              {student.full_name?.split(' ').map(n => n[0]).join('') || 'S'}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <p className="font-medium">{student.full_name || 'Unnamed Student'}</p>
+                            <p className="text-sm text-muted-foreground">{student.email}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-6">
+                          <div className="text-right">
+                            <p className="text-sm font-medium">{student.department || 'N/A'}</p>
+                          </div>
+                          {getStatusBadge('active')}
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon">
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem>
+                                <Edit className="h-4 w-4 mr-2" />
+                                Edit
+                              </DropdownMenuItem>
+                              <DropdownMenuItem>
+                                <Mail className="h-4 w-4 mr-2" />
+                                Send Email
+                              </DropdownMenuItem>
+                              <DropdownMenuItem className="text-destructive">
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </div>
                       </div>
-                      <div className="flex items-center gap-6">
-                        <div className="text-right">
-                          <p className="text-sm font-medium">{student.class}</p>
-                          <p className="text-xs text-muted-foreground">Roll: {student.rollNo}</p>
-                        </div>
-                        {getStatusBadge(student.status)}
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon">
-                              <MoreVertical className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem>
-                              <Edit className="h-4 w-4 mr-2" />
-                              Edit
-                            </DropdownMenuItem>
-                            <DropdownMenuItem>
-                              <Mail className="h-4 w-4 mr-2" />
-                              Send Email
-                            </DropdownMenuItem>
-                            <DropdownMenuItem className="text-destructive">
-                              <Trash2 className="h-4 w-4 mr-2" />
-                              Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="p-8 text-center">
+                    <GraduationCap className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                    <p className="text-muted-foreground">No students found</p>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -226,55 +241,57 @@ export default function UsersManagement() {
           <TabsContent value="teachers" className="space-y-4">
             <Card className="shadow-card">
               <CardContent className="p-0">
-                <div className="divide-y">
-                  {usersData.teachers.map((teacher) => (
-                    <div key={teacher.id} className="flex items-center justify-between p-4 hover:bg-muted/50 transition-colors">
-                      <div className="flex items-center gap-4">
-                        <Avatar>
-                          <AvatarFallback className="bg-success/10 text-success">
-                            {teacher.name.split(' ').map(n => n[0]).join('')}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <p className="font-medium">{teacher.name}</p>
-                          <p className="text-sm text-muted-foreground">{teacher.email}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-6">
-                        <div className="text-right">
-                          <p className="text-sm font-medium">{teacher.department}</p>
-                          <div className="flex gap-1">
-                            {teacher.subjects.map((subject, idx) => (
-                              <Badge key={idx} variant="secondary" className="text-xs">{subject}</Badge>
-                            ))}
+                {filteredTeachers.length > 0 ? (
+                  <div className="divide-y">
+                    {filteredTeachers.map((teacher) => (
+                      <div key={teacher.id} className="flex items-center justify-between p-4 hover:bg-muted/50 transition-colors">
+                        <div className="flex items-center gap-4">
+                          <Avatar>
+                            <AvatarFallback className="bg-success/10 text-success">
+                              {teacher.full_name?.split(' ').map(n => n[0]).join('') || 'T'}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <p className="font-medium">{teacher.full_name || 'Unnamed Faculty'}</p>
+                            <p className="text-sm text-muted-foreground">{teacher.email}</p>
                           </div>
                         </div>
-                        {getStatusBadge(teacher.status)}
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon">
-                              <MoreVertical className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem>
-                              <Edit className="h-4 w-4 mr-2" />
-                              Edit
-                            </DropdownMenuItem>
-                            <DropdownMenuItem>
-                              <Mail className="h-4 w-4 mr-2" />
-                              Send Email
-                            </DropdownMenuItem>
-                            <DropdownMenuItem className="text-destructive">
-                              <Trash2 className="h-4 w-4 mr-2" />
-                              Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                        <div className="flex items-center gap-6">
+                          <div className="text-right">
+                            <p className="text-sm font-medium">{teacher.department || 'N/A'}</p>
+                          </div>
+                          {getStatusBadge('active')}
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon">
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem>
+                                <Edit className="h-4 w-4 mr-2" />
+                                Edit
+                              </DropdownMenuItem>
+                              <DropdownMenuItem>
+                                <Mail className="h-4 w-4 mr-2" />
+                                Send Email
+                              </DropdownMenuItem>
+                              <DropdownMenuItem className="text-destructive">
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="p-8 text-center">
+                    <BookOpen className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                    <p className="text-muted-foreground">No faculty members found</p>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -282,44 +299,51 @@ export default function UsersManagement() {
           <TabsContent value="admins" className="space-y-4">
             <Card className="shadow-card">
               <CardContent className="p-0">
-                <div className="divide-y">
-                  {usersData.admins.map((admin) => (
-                    <div key={admin.id} className="flex items-center justify-between p-4 hover:bg-muted/50 transition-colors">
-                      <div className="flex items-center gap-4">
-                        <Avatar>
-                          <AvatarFallback className="bg-warning/10 text-warning">
-                            {admin.name.split(' ').map(n => n[0]).join('')}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <p className="font-medium">{admin.name}</p>
-                          <p className="text-sm text-muted-foreground">{admin.email}</p>
+                {filteredAdmins.length > 0 ? (
+                  <div className="divide-y">
+                    {filteredAdmins.map((admin) => (
+                      <div key={admin.id} className="flex items-center justify-between p-4 hover:bg-muted/50 transition-colors">
+                        <div className="flex items-center gap-4">
+                          <Avatar>
+                            <AvatarFallback className="bg-warning/10 text-warning">
+                              {admin.full_name?.split(' ').map(n => n[0]).join('') || 'A'}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <p className="font-medium">{admin.full_name || 'Unnamed Admin'}</p>
+                            <p className="text-sm text-muted-foreground">{admin.email}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-6">
+                          <Badge variant="outline">Admin</Badge>
+                          {getStatusBadge('active')}
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon">
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem>
+                                <Edit className="h-4 w-4 mr-2" />
+                                Edit
+                              </DropdownMenuItem>
+                              <DropdownMenuItem>
+                                <Mail className="h-4 w-4 mr-2" />
+                                Send Email
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </div>
                       </div>
-                      <div className="flex items-center gap-6">
-                        <Badge variant="outline">{admin.role}</Badge>
-                        {getStatusBadge(admin.status)}
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon">
-                              <MoreVertical className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem>
-                              <Edit className="h-4 w-4 mr-2" />
-                              Edit
-                            </DropdownMenuItem>
-                            <DropdownMenuItem>
-                              <Mail className="h-4 w-4 mr-2" />
-                              Send Email
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="p-8 text-center">
+                    <Shield className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                    <p className="text-muted-foreground">No admins found</p>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>

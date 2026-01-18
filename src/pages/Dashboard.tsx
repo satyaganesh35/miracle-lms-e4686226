@@ -1,5 +1,5 @@
 import { useAuth } from '@/hooks/useAuth';
-import { useAttendance, useAssignments, useSubmissions, useNotifications, useFees, useTimetable, useMaterials } from '@/hooks/useLMS';
+import { useAttendance, useAssignments, useSubmissions, useNotifications, useFees, useTimetable, useMaterials, useCourses, useProfiles } from '@/hooks/useLMS';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import WelcomeCard from '@/components/dashboard/WelcomeCard';
 import StatsGrid from '@/components/dashboard/StatsGrid';
@@ -187,6 +187,11 @@ function TeacherDashboard() {
   const { user } = useAuth();
   const { data: assignments, isLoading } = useAssignments();
   const { data: materials } = useMaterials();
+  const { data: timetable } = useTimetable();
+
+  // Get today's classes count
+  const today = new Date().toLocaleDateString('en-US', { weekday: 'long' });
+  const todayClasses = timetable?.filter(t => t.day_of_week === today).length || 0;
   
   if (isLoading) {
     return (
@@ -203,7 +208,7 @@ function TeacherDashboard() {
     <div className="space-y-6 animate-fade-in">
       {/* Welcome Card */}
       <WelcomeCard 
-        userName={user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Teacher'} 
+        userName={user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Faculty'} 
         role="teacher" 
       />
 
@@ -223,13 +228,13 @@ function TeacherDashboard() {
         },
         {
           title: 'Classes Today',
-          value: '4',
+          value: todayClasses,
           icon: <Calendar className="h-6 w-6" />,
           variant: 'success',
         },
         {
           title: 'Pending Grading',
-          value: '12',
+          value: 0,
           icon: <BarChart3 className="h-6 w-6" />,
           variant: 'warning',
         },
@@ -291,6 +296,17 @@ function TeacherDashboard() {
 function AdminDashboard() {
   const { user } = useAuth();
   const { data: notifications } = useNotifications();
+  const { data: profiles } = useProfiles();
+  const { data: courses } = useCourses();
+  const { data: fees } = useFees();
+  
+  // Calculate user counts
+  const totalUsers = profiles?.length || 0;
+  const studentCount = profiles?.filter(p => p.role === 'student').length || 0;
+  const teacherCount = profiles?.filter(p => p.role === 'teacher').length || 0;
+
+  // Calculate fee collection
+  const totalCollected = fees?.filter(f => f.status === 'paid').reduce((sum, f) => sum + Number(f.amount), 0) || 0;
   
   return (
     <div className="space-y-6 animate-fade-in">
@@ -304,14 +320,13 @@ function AdminDashboard() {
       <StatsGrid stats={[
         {
           title: 'Total Users',
-          value: '2,535',
+          value: totalUsers,
           icon: <Users className="h-6 w-6" />,
           variant: 'primary',
-          trend: { value: 12, isPositive: true },
         },
         {
           title: 'Active Courses',
-          value: '124',
+          value: courses?.length || 0,
           icon: <BookOpen className="h-6 w-6" />,
           variant: 'success',
         },
@@ -323,10 +338,9 @@ function AdminDashboard() {
         },
         {
           title: 'Fee Collection',
-          value: '₹24.5L',
+          value: totalCollected > 0 ? `₹${(totalCollected / 100000).toFixed(1)}L` : '₹0',
           icon: <TrendingUp className="h-6 w-6" />,
           variant: 'warning',
-          trend: { value: 8, isPositive: true },
         },
       ]} />
 
@@ -348,35 +362,50 @@ function AdminDashboard() {
               <div className="p-2 rounded-lg bg-info/10">
                 <Activity className="h-5 w-5 text-info" />
               </div>
-              Recent Activity
+              System Overview
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
-              {[
-                { action: 'New student registration', time: '2 mins ago', type: 'success' },
-                { action: 'Fee payment received - ₹15,000', time: '15 mins ago', type: 'info' },
-                { action: 'Assignment submitted by 45 students', time: '1 hour ago', type: 'default' },
-                { action: 'New course material uploaded', time: '2 hours ago', type: 'default' },
-                { action: 'System backup completed', time: '3 hours ago', type: 'success' },
-              ].map((item, index) => (
-                <div key={index} className="flex items-center gap-4 p-3 rounded-xl hover:bg-muted/50 transition-colors">
-                  <div className={`h-2.5 w-2.5 rounded-full ${
-                    item.type === 'success' ? 'bg-success' : 
-                    item.type === 'info' ? 'bg-info' : 'bg-primary'
-                  }`} />
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">{item.action}</p>
+            <div className="grid gap-4 md:grid-cols-3">
+              <div className="p-4 rounded-xl bg-primary/5 border border-primary/10">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-primary/10">
+                    <GraduationCap className="h-5 w-5 text-primary" />
                   </div>
-                  <p className="text-xs text-muted-foreground">{item.time}</p>
+                  <div>
+                    <p className="text-2xl font-bold">{studentCount}</p>
+                    <p className="text-xs text-muted-foreground">Students</p>
+                  </div>
                 </div>
-              ))}
+              </div>
+              <div className="p-4 rounded-xl bg-success/5 border border-success/10">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-success/10">
+                    <BookOpen className="h-5 w-5 text-success" />
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold">{teacherCount}</p>
+                    <p className="text-xs text-muted-foreground">Faculty</p>
+                  </div>
+                </div>
+              </div>
+              <div className="p-4 rounded-xl bg-info/5 border border-info/10">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-info/10">
+                    <BookOpen className="h-5 w-5 text-info" />
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold">{courses?.length || 0}</p>
+                    <p className="text-xs text-muted-foreground">Courses</p>
+                  </div>
+                </div>
+              </div>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* System Overview */}
+      {/* System Status */}
       <div className="grid gap-6 lg:grid-cols-3">
         <Card className="shadow-lg border-0 bg-gradient-to-br from-primary/5 to-primary/10">
           <CardContent className="p-6">
@@ -403,7 +432,7 @@ function AdminDashboard() {
                 <p className="text-sm text-muted-foreground">AI Chatbot</p>
                 <p className="text-2xl font-bold font-display mt-1">Active</p>
                 <p className="text-xs text-muted-foreground mt-2">
-                  156 queries resolved today
+                  Ready to assist
                 </p>
               </div>
               <div className="p-4 rounded-xl bg-info/10">
@@ -462,16 +491,11 @@ export default function Dashboard() {
           </div>
           <h2 className="text-2xl font-display font-bold mb-2">Welcome to Miracle LMS</h2>
           <p className="text-muted-foreground mb-6 max-w-md">
-            Your profile is being set up. This may take a moment. If this persists, please try signing out and back in.
+            Your role has not been assigned yet. Please contact the administrator for access.
           </p>
-          <div className="flex gap-3">
-            <Button onClick={() => window.location.reload()} variant="outline">
-              Refresh Page
-            </Button>
-            <Link to="/auth">
-              <Button>Go to Login</Button>
-            </Link>
-          </div>
+          <Button asChild>
+            <Link to="/query-bot">Talk to AI Assistant</Link>
+          </Button>
         </div>
       )}
     </DashboardLayout>
