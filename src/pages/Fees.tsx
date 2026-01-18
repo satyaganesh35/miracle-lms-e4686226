@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useMemo } from 'react';
 import { useAuth } from '@/hooks/useAuth';
+import { useFees } from '@/hooks/useLMS';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -8,54 +9,55 @@ import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
   CreditCard, IndianRupee, Calendar, CheckCircle, AlertCircle, 
-  Clock, Download, Search, Filter, FileText
+  Clock, Download, Search, Filter, FileText, Loader2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-
-const studentFees = {
-  totalDue: 45000,
-  paid: 30000,
-  pending: 15000,
-  dueDate: '2024-01-25',
-  history: [
-    { id: 1, description: 'Tuition Fee - Semester 2', amount: 30000, status: 'paid', date: '2024-01-10', transactionId: 'TXN123456' },
-    { id: 2, description: 'Library Fee', amount: 2000, status: 'paid', date: '2024-01-10', transactionId: 'TXN123457' },
-    { id: 3, description: 'Lab Fee', amount: 5000, status: 'pending', dueDate: '2024-01-25' },
-    { id: 4, description: 'Exam Fee', amount: 3000, status: 'pending', dueDate: '2024-01-25' },
-    { id: 5, description: 'Sports Fee', amount: 2000, status: 'pending', dueDate: '2024-01-25' },
-    { id: 6, description: 'Transport Fee', amount: 3000, status: 'pending', dueDate: '2024-01-25' },
-  ],
-  breakdown: [
-    { category: 'Tuition', amount: 30000 },
-    { category: 'Lab Fees', amount: 5000 },
-    { category: 'Library', amount: 2000 },
-    { category: 'Exam', amount: 3000 },
-    { category: 'Sports', amount: 2000 },
-    { category: 'Transport', amount: 3000 },
-  ],
-};
-
-const adminFeeData = [
-  { id: 1, name: 'Rahul Kumar', rollNo: '101', class: '10-A', total: 45000, paid: 45000, pending: 0, status: 'paid' },
-  { id: 2, name: 'Priya Sharma', rollNo: '102', class: '10-A', total: 45000, paid: 30000, pending: 15000, status: 'partial' },
-  { id: 3, name: 'Amit Patel', rollNo: '103', class: '10-A', total: 45000, paid: 0, pending: 45000, status: 'unpaid' },
-  { id: 4, name: 'Sneha Reddy', rollNo: '104', class: '10-A', total: 45000, paid: 45000, pending: 0, status: 'paid' },
-  { id: 5, name: 'Vikram Singh', rollNo: '105', class: '10-A', total: 45000, paid: 15000, pending: 30000, status: 'partial' },
-];
+import { format } from 'date-fns';
 
 export default function Fees() {
-  const { userRole } = useAuth();
+  const { user, userRole } = useAuth();
   const isAdmin = userRole === 'admin';
+  
+  const { data: fees, isLoading } = useFees(user?.id);
+
+  // Calculate fee statistics
+  const feeStats = useMemo(() => {
+    if (!fees) return { totalDue: 0, paid: 0, pending: 0, history: [] };
+
+    const paid = fees.filter(f => f.status === 'paid').reduce((sum, f) => sum + f.amount, 0);
+    const pending = fees.filter(f => f.status === 'pending' || f.status === 'overdue').reduce((sum, f) => sum + f.amount, 0);
+    const totalDue = paid + pending;
+
+    return {
+      totalDue,
+      paid,
+      pending,
+      history: fees.map(f => ({
+        ...f,
+        date: f.paid_date || f.due_date
+      }))
+    };
+  }, [fees]);
 
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'paid': return <Badge className="bg-success/10 text-success border-success/30">Paid</Badge>;
       case 'partial': return <Badge className="bg-warning/10 text-warning border-warning/30">Partial</Badge>;
-      case 'pending': return <Badge className="bg-destructive/10 text-destructive border-destructive/30">Pending</Badge>;
-      case 'unpaid': return <Badge className="bg-destructive/10 text-destructive border-destructive/30">Unpaid</Badge>;
+      case 'pending': return <Badge className="bg-warning/10 text-warning border-warning/30">Pending</Badge>;
+      case 'overdue': return <Badge className="bg-destructive/10 text-destructive border-destructive/30">Overdue</Badge>;
       default: return null;
     }
   };
+
+  if (isLoading) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   if (isAdmin) {
     return (
@@ -82,7 +84,7 @@ export default function Fees() {
                     <CheckCircle className="h-5 w-5 text-success" />
                   </div>
                   <div>
-                    <p className="text-2xl font-bold text-success">₹24.5L</p>
+                    <p className="text-2xl font-bold text-success">₹{feeStats.paid.toLocaleString()}</p>
                     <p className="text-sm text-muted-foreground">Collected</p>
                   </div>
                 </div>
@@ -95,7 +97,7 @@ export default function Fees() {
                     <Clock className="h-5 w-5 text-warning" />
                   </div>
                   <div>
-                    <p className="text-2xl font-bold text-warning">₹8.2L</p>
+                    <p className="text-2xl font-bold text-warning">₹{feeStats.pending.toLocaleString()}</p>
                     <p className="text-sm text-muted-foreground">Pending</p>
                   </div>
                 </div>
@@ -108,8 +110,10 @@ export default function Fees() {
                     <AlertCircle className="h-5 w-5 text-destructive" />
                   </div>
                   <div>
-                    <p className="text-2xl font-bold text-destructive">45</p>
-                    <p className="text-sm text-muted-foreground">Defaulters</p>
+                    <p className="text-2xl font-bold text-destructive">
+                      {fees?.filter(f => f.status === 'overdue').length || 0}
+                    </p>
+                    <p className="text-sm text-muted-foreground">Overdue</p>
                   </div>
                 </div>
               </CardContent>
@@ -121,7 +125,7 @@ export default function Fees() {
                     <IndianRupee className="h-5 w-5 text-primary" />
                   </div>
                   <div>
-                    <p className="text-2xl font-bold">₹32.7L</p>
+                    <p className="text-2xl font-bold">₹{feeStats.totalDue.toLocaleString()}</p>
                     <p className="text-sm text-muted-foreground">Total Expected</p>
                   </div>
                 </div>
@@ -129,52 +133,55 @@ export default function Fees() {
             </Card>
           </div>
 
-          {/* Student Fee List */}
+          {/* All Fee Records */}
           <Card className="shadow-card">
             <CardHeader>
               <div className="flex items-center justify-between">
-                <CardTitle className="font-display">Student Fee Status</CardTitle>
+                <CardTitle className="font-display">Fee Records</CardTitle>
                 <div className="flex items-center gap-2">
                   <div className="relative">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input placeholder="Search students..." className="pl-9 w-64" />
+                    <Input placeholder="Search..." className="pl-9 w-64" />
                   </div>
-                  <Button variant="outline" size="icon">
-                    <Filter className="h-4 w-4" />
-                  </Button>
                 </div>
               </div>
             </CardHeader>
             <CardContent>
-              <div className="space-y-3">
-                {adminFeeData.map((student) => (
-                  <div key={student.id} className="flex items-center justify-between p-4 rounded-lg border hover:shadow-md transition-shadow">
-                    <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center font-medium">
-                        {student.name.charAt(0)}
+              {fees && fees.length > 0 ? (
+                <div className="space-y-3">
+                  {fees.map((fee) => (
+                    <div key={fee.id} className="flex items-center justify-between p-4 rounded-lg border hover:shadow-md transition-shadow">
+                      <div className="flex items-center gap-4">
+                        <div className={cn(
+                          "p-2 rounded-lg",
+                          fee.status === 'paid' ? "bg-success/10" : "bg-warning/10"
+                        )}>
+                          {fee.status === 'paid' ? (
+                            <CheckCircle className="h-5 w-5 text-success" />
+                          ) : (
+                            <Clock className="h-5 w-5 text-warning" />
+                          )}
+                        </div>
+                        <div>
+                          <p className="font-medium">{fee.description}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {fee.status === 'paid' 
+                              ? `Paid on ${format(new Date(fee.paid_date!), 'MMM dd, yyyy')}` 
+                              : `Due on ${format(new Date(fee.due_date), 'MMM dd, yyyy')}`
+                            }
+                          </p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="font-medium">{student.name}</p>
-                        <p className="text-sm text-muted-foreground">Roll: {student.rollNo} • {student.class}</p>
+                      <div className="flex items-center gap-4">
+                        <p className="text-lg font-semibold">₹{fee.amount.toLocaleString()}</p>
+                        {getStatusBadge(fee.status || 'pending')}
                       </div>
                     </div>
-                    <div className="flex items-center gap-6">
-                      <div className="text-right">
-                        <p className="text-sm text-muted-foreground">Paid</p>
-                        <p className="font-semibold text-success">₹{student.paid.toLocaleString()}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-sm text-muted-foreground">Pending</p>
-                        <p className={cn("font-semibold", student.pending > 0 ? "text-destructive" : "text-success")}>
-                          ₹{student.pending.toLocaleString()}
-                        </p>
-                      </div>
-                      {getStatusBadge(student.status)}
-                      <Button variant="outline" size="sm">View Details</Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-muted-foreground text-center py-8">No fee records found</p>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -198,7 +205,7 @@ export default function Fees() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground">Total Fee</p>
-                  <p className="text-3xl font-display font-bold">₹{studentFees.totalDue.toLocaleString()}</p>
+                  <p className="text-3xl font-display font-bold">₹{feeStats.totalDue.toLocaleString()}</p>
                 </div>
                 <div className="p-3 rounded-xl bg-primary/10">
                   <IndianRupee className="h-6 w-6 text-primary" />
@@ -211,7 +218,7 @@ export default function Fees() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground">Paid</p>
-                  <p className="text-3xl font-display font-bold text-success">₹{studentFees.paid.toLocaleString()}</p>
+                  <p className="text-3xl font-display font-bold text-success">₹{feeStats.paid.toLocaleString()}</p>
                 </div>
                 <div className="p-3 rounded-xl bg-success/10">
                   <CheckCircle className="h-6 w-6 text-success" />
@@ -224,22 +231,18 @@ export default function Fees() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground">Pending</p>
-                  <p className="text-3xl font-display font-bold text-warning">₹{studentFees.pending.toLocaleString()}</p>
+                  <p className="text-3xl font-display font-bold text-warning">₹{feeStats.pending.toLocaleString()}</p>
                 </div>
                 <div className="p-3 rounded-xl bg-warning/10">
                   <Clock className="h-6 w-6 text-warning" />
                 </div>
-              </div>
-              <div className="mt-3 flex items-center gap-2 text-sm text-warning">
-                <Calendar className="h-4 w-4" />
-                Due: {studentFees.dueDate}
               </div>
             </CardContent>
           </Card>
         </div>
 
         {/* Pay Now */}
-        {studentFees.pending > 0 && (
+        {feeStats.pending > 0 && (
           <Card className="shadow-card border-primary/20">
             <CardContent className="p-6">
               <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
@@ -249,7 +252,7 @@ export default function Fees() {
                   </div>
                   <div>
                     <p className="font-semibold">Pay your pending fee</p>
-                    <p className="text-sm text-muted-foreground">Amount due: ₹{studentFees.pending.toLocaleString()}</p>
+                    <p className="text-sm text-muted-foreground">Amount due: ₹{feeStats.pending.toLocaleString()}</p>
                   </div>
                 </div>
                 <Button variant="hero" size="lg">
@@ -261,88 +264,60 @@ export default function Fees() {
           </Card>
         )}
 
-        {/* Tabs */}
-        <Tabs defaultValue="history" className="space-y-4">
-          <TabsList>
-            <TabsTrigger value="history">Payment History</TabsTrigger>
-            <TabsTrigger value="breakdown">Fee Breakdown</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="history" className="space-y-4">
-            <Card className="shadow-card">
-              <CardHeader>
-                <CardTitle className="font-display">Transaction History</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {studentFees.history.map((item) => (
-                    <div key={item.id} className={cn(
-                      "flex items-center justify-between p-4 rounded-lg border",
-                      item.status === 'paid' ? "bg-success/5" : "bg-warning/5"
-                    )}>
-                      <div className="flex items-center gap-4">
-                        <div className={cn(
-                          "p-2 rounded-lg",
-                          item.status === 'paid' ? "bg-success/10" : "bg-warning/10"
-                        )}>
-                          {item.status === 'paid' ? (
-                            <CheckCircle className="h-5 w-5 text-success" />
-                          ) : (
-                            <Clock className="h-5 w-5 text-warning" />
-                          )}
-                        </div>
-                        <div>
-                          <p className="font-medium">{item.description}</p>
-                          <p className="text-sm text-muted-foreground">
-                            {item.status === 'paid' ? `Paid on ${item.date}` : `Due on ${item.dueDate}`}
-                          </p>
-                          {item.transactionId && (
-                            <p className="text-xs text-muted-foreground">ID: {item.transactionId}</p>
-                          )}
-                        </div>
+        {/* Payment History */}
+        <Card className="shadow-card">
+          <CardHeader>
+            <CardTitle className="font-display">Transaction History</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {fees && fees.length > 0 ? (
+              <div className="space-y-3">
+                {fees.map((item) => (
+                  <div key={item.id} className={cn(
+                    "flex items-center justify-between p-4 rounded-lg border",
+                    item.status === 'paid' ? "bg-success/5" : "bg-warning/5"
+                  )}>
+                    <div className="flex items-center gap-4">
+                      <div className={cn(
+                        "p-2 rounded-lg",
+                        item.status === 'paid' ? "bg-success/10" : "bg-warning/10"
+                      )}>
+                        {item.status === 'paid' ? (
+                          <CheckCircle className="h-5 w-5 text-success" />
+                        ) : (
+                          <Clock className="h-5 w-5 text-warning" />
+                        )}
                       </div>
-                      <div className="flex items-center gap-4">
-                        <p className="text-lg font-semibold">₹{item.amount.toLocaleString()}</p>
-                        {getStatusBadge(item.status)}
-                        {item.status === 'paid' && (
-                          <Button variant="ghost" size="sm">
-                            <Download className="h-4 w-4" />
-                          </Button>
+                      <div>
+                        <p className="font-medium">{item.description}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {item.status === 'paid' 
+                            ? `Paid on ${format(new Date(item.paid_date!), 'MMM dd, yyyy')}` 
+                            : `Due on ${format(new Date(item.due_date), 'MMM dd, yyyy')}`
+                          }
+                        </p>
+                        {item.transaction_id && (
+                          <p className="text-xs text-muted-foreground">ID: {item.transaction_id}</p>
                         )}
                       </div>
                     </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="breakdown" className="space-y-4">
-            <Card className="shadow-card">
-              <CardHeader>
-                <CardTitle className="font-display">Fee Structure</CardTitle>
-                <CardDescription>Breakdown of your semester fee</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {studentFees.breakdown.map((item, index) => (
-                    <div key={index} className="flex items-center justify-between p-4 rounded-lg bg-muted/50">
-                      <div className="flex items-center gap-3">
-                        <FileText className="h-5 w-5 text-muted-foreground" />
-                        <span className="font-medium">{item.category}</span>
-                      </div>
-                      <span className="font-semibold">₹{item.amount.toLocaleString()}</span>
+                    <div className="flex items-center gap-4">
+                      <p className="text-lg font-semibold">₹{item.amount.toLocaleString()}</p>
+                      {getStatusBadge(item.status || 'pending')}
+                      {item.status === 'paid' && (
+                        <Button variant="ghost" size="sm">
+                          <Download className="h-4 w-4" />
+                        </Button>
+                      )}
                     </div>
-                  ))}
-                  <div className="flex items-center justify-between p-4 rounded-lg bg-primary/10 mt-4">
-                    <span className="font-semibold">Total</span>
-                    <span className="text-xl font-bold">₹{studentFees.totalDue.toLocaleString()}</span>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
+                ))}
+              </div>
+            ) : (
+              <p className="text-muted-foreground text-center py-8">No payment history</p>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </DashboardLayout>
   );

@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useAuth } from '@/hooks/useAuth';
+import { useAttendance, useClasses, useMarkAttendance } from '@/hooks/useLMS';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -9,60 +10,89 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import { 
   CheckSquare, Calendar, TrendingUp, AlertCircle, 
-  Check, X, Clock, Users, Save
+  Check, X, Clock, Users, Save, Loader2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-
-const studentAttendance = {
-  overall: 92,
-  thisMonth: 95,
-  subjects: [
-    { name: 'Data Structures & Algorithms', present: 28, total: 30, percentage: 93 },
-    { name: 'Database Management Systems', present: 26, total: 28, percentage: 93 },
-    { name: 'Operating Systems', present: 24, total: 26, percentage: 92 },
-    { name: 'Computer Networks', present: 22, total: 24, percentage: 92 },
-    { name: 'Software Engineering', present: 20, total: 22, percentage: 91 },
-  ],
-  recentClasses: [
-    { date: '2026-01-18', subject: 'Data Structures & Algorithms', status: 'present' },
-    { date: '2026-01-18', subject: 'Database Management Systems', status: 'present' },
-    { date: '2026-01-17', subject: 'Operating Systems', status: 'present' },
-    { date: '2026-01-17', subject: 'Software Engineering', status: 'absent' },
-    { date: '2026-01-16', subject: 'Computer Networks', status: 'present' },
-    { date: '2026-01-16', subject: 'Data Structures & Algorithms', status: 'present' },
-    { date: '2026-01-15', subject: 'Database Management Systems', status: 'late' },
-    { date: '2026-01-15', subject: 'Operating Systems', status: 'present' },
-  ],
-};
-
-const classStudents = [
-  { id: 1, name: 'Rahul Kumar', rollNo: '101', present: false },
-  { id: 2, name: 'Priya Sharma', rollNo: '102', present: false },
-  { id: 3, name: 'Amit Patel', rollNo: '103', present: false },
-  { id: 4, name: 'Sneha Reddy', rollNo: '104', present: false },
-  { id: 5, name: 'Vikram Singh', rollNo: '105', present: false },
-  { id: 6, name: 'Ananya Gupta', rollNo: '106', present: false },
-  { id: 7, name: 'Karthik Nair', rollNo: '107', present: false },
-  { id: 8, name: 'Divya Menon', rollNo: '108', present: false },
-];
+import { toast } from 'sonner';
 
 export default function Attendance() {
-  const { userRole } = useAuth();
+  const { user, userRole } = useAuth();
   const isTeacher = userRole === 'teacher' || userRole === 'admin';
-  const [students, setStudents] = useState(classStudents);
-  const [selectedClass, setSelectedClass] = useState('cse-2a');
+  
+  const { data: attendanceRecords, isLoading } = useAttendance(user?.id);
+  const { data: classes } = useClasses();
+  const markAttendance = useMarkAttendance();
 
-  const toggleAttendance = (studentId: number) => {
-    setStudents(prev => prev.map(s => 
-      s.id === studentId ? { ...s, present: !s.present } : s
-    ));
+  const [selectedClass, setSelectedClass] = useState<string>('');
+  const [attendanceState, setAttendanceState] = useState<Record<string, boolean>>({});
+
+  // Calculate attendance stats for student view
+  const attendanceStats = useMemo(() => {
+    if (!attendanceRecords) return { overall: 0, thisMonth: 0, subjects: [], recentClasses: [] };
+
+    const presentCount = attendanceRecords.filter(r => r.status === 'present').length;
+    const totalCount = attendanceRecords.length;
+    const overall = totalCount > 0 ? Math.round((presentCount / totalCount) * 100) : 0;
+
+    // This month
+    const thisMonth = new Date().getMonth();
+    const thisMonthRecords = attendanceRecords.filter(r => new Date(r.date).getMonth() === thisMonth);
+    const thisMonthPresent = thisMonthRecords.filter(r => r.status === 'present').length;
+    const thisMonthPercentage = thisMonthRecords.length > 0 
+      ? Math.round((thisMonthPresent / thisMonthRecords.length) * 100) : 0;
+
+    // Group by subject
+    const subjectMap = new Map<string, { present: number; total: number }>();
+    attendanceRecords.forEach(record => {
+      const subject = record.classes?.courses?.name || 'Unknown';
+      if (!subjectMap.has(subject)) {
+        subjectMap.set(subject, { present: 0, total: 0 });
+      }
+      const stats = subjectMap.get(subject)!;
+      stats.total++;
+      if (record.status === 'present') stats.present++;
+    });
+
+    const subjects = Array.from(subjectMap.entries()).map(([name, stats]) => ({
+      name,
+      present: stats.present,
+      total: stats.total,
+      percentage: Math.round((stats.present / stats.total) * 100)
+    }));
+
+    const recentClasses = attendanceRecords.slice(0, 8).map(r => ({
+      date: r.date,
+      subject: r.classes?.courses?.name || 'Unknown',
+      status: r.status
+    }));
+
+    return { overall, thisMonth: thisMonthPercentage, subjects, recentClasses };
+  }, [attendanceRecords]);
+
+  const toggleAttendance = (studentId: string) => {
+    setAttendanceState(prev => ({ ...prev, [studentId]: !prev[studentId] }));
   };
 
-  const markAllPresent = () => {
-    setStudents(prev => prev.map(s => ({ ...s, present: true })));
-  };
+  const handleSaveAttendance = async () => {
+    if (!selectedClass || !user?.id) return;
 
-  const presentCount = students.filter(s => s.present).length;
+    const records = Object.entries(attendanceState).map(([studentId, present]) => ({
+      studentId,
+      status: present ? 'present' as const : 'absent' as const
+    }));
+
+    try {
+      await markAttendance.mutateAsync({
+        classId: selectedClass,
+        date: new Date().toISOString().split('T')[0],
+        records,
+        markedBy: user.id
+      });
+      toast.success('Attendance saved successfully');
+    } catch (error) {
+      toast.error('Failed to save attendance');
+    }
+  };
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -82,6 +112,16 @@ export default function Attendance() {
     }
   };
 
+  if (isLoading) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      </DashboardLayout>
+    );
+  }
+
   if (isTeacher) {
     return (
       <DashboardLayout>
@@ -94,108 +134,51 @@ export default function Attendance() {
             </div>
             <div className="flex items-center gap-3">
               <Select value={selectedClass} onValueChange={setSelectedClass}>
-                <SelectTrigger className="w-40">
+                <SelectTrigger className="w-64">
                   <SelectValue placeholder="Select class" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="cse-2a">CSE 2nd Year - Sec A</SelectItem>
-                  <SelectItem value="cse-2b">CSE 2nd Year - Sec B</SelectItem>
-                  <SelectItem value="cse-3a">CSE 3rd Year - Sec A</SelectItem>
-                  <SelectItem value="ece-2a">ECE 2nd Year - Sec A</SelectItem>
-                  <SelectItem value="eee-3a">EEE 3rd Year - Sec A</SelectItem>
+                  {classes?.map((cls) => (
+                    <SelectItem key={cls.id} value={cls.id}>
+                      {cls.courses?.name} - {cls.section}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
           </div>
 
-          {/* Stats */}
-          <div className="grid gap-4 md:grid-cols-3">
+          {!selectedClass ? (
             <Card className="shadow-card">
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-primary/10">
-                    <Users className="h-5 w-5 text-primary" />
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold">{students.length}</p>
-                    <p className="text-sm text-muted-foreground">Total Students</p>
-                  </div>
-                </div>
+              <CardContent className="p-8 text-center">
+                <Users className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                <p className="text-muted-foreground">Select a class to mark attendance</p>
               </CardContent>
             </Card>
-            <Card className="shadow-card bg-success/5 border-success/20">
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-success/20">
-                    <Check className="h-5 w-5 text-success" />
-                  </div>
+          ) : (
+            <Card className="shadow-card">
+              <CardHeader>
+                <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-2xl font-bold text-success">{presentCount}</p>
-                    <p className="text-sm text-muted-foreground">Present</p>
+                    <CardTitle className="font-display">Mark Attendance</CardTitle>
+                    <CardDescription>{new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</CardDescription>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button variant="hero" onClick={handleSaveAttendance} disabled={markAttendance.isPending}>
+                      {markAttendance.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                      <Save className="h-4 w-4 mr-2" />
+                      Save Attendance
+                    </Button>
                   </div>
                 </div>
+              </CardHeader>
+              <CardContent>
+                <p className="text-muted-foreground text-center py-8">
+                  Student list will be loaded from enrollments for the selected class
+                </p>
               </CardContent>
             </Card>
-            <Card className="shadow-card bg-destructive/5 border-destructive/20">
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-destructive/20">
-                    <X className="h-5 w-5 text-destructive" />
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold text-destructive">{students.length - presentCount}</p>
-                    <p className="text-sm text-muted-foreground">Absent</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Attendance List */}
-          <Card className="shadow-card">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="font-display">{selectedClass.toUpperCase().replace('-', ' - Sec ')} - Data Structures</CardTitle>
-                  <CardDescription>{new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</CardDescription>
-                </div>
-                <div className="flex gap-2">
-                  <Button variant="outline" onClick={markAllPresent}>Mark All Present</Button>
-                  <Button variant="hero">
-                    <Save className="h-4 w-4 mr-2" />
-                    Save Attendance
-                  </Button>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                {students.map((student) => (
-                  <div 
-                    key={student.id} 
-                    className={cn(
-                      "flex items-center justify-between p-4 rounded-lg border cursor-pointer transition-colors",
-                      student.present ? "bg-success/5 border-success/20" : "hover:bg-muted/50"
-                    )}
-                    onClick={() => toggleAttendance(student.id)}
-                  >
-                    <div className="flex items-center gap-4">
-                      <Checkbox checked={student.present} />
-                      <div>
-                        <p className="font-medium">{student.name}</p>
-                        <p className="text-sm text-muted-foreground">Roll No: {student.rollNo}</p>
-                      </div>
-                    </div>
-                    {student.present ? (
-                      <Badge className="bg-success text-success-foreground">Present</Badge>
-                    ) : (
-                      <Badge variant="outline">Absent</Badge>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+          )}
         </div>
       </DashboardLayout>
     );
@@ -217,13 +200,13 @@ export default function Attendance() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground">Overall Attendance</p>
-                  <p className="text-3xl font-display font-bold">{studentAttendance.overall}%</p>
+                  <p className="text-3xl font-display font-bold">{attendanceStats.overall}%</p>
                 </div>
                 <div className="p-3 rounded-xl bg-primary/10">
                   <CheckSquare className="h-6 w-6 text-primary" />
                 </div>
               </div>
-              <Progress value={studentAttendance.overall} className="h-2 mt-4" />
+              <Progress value={attendanceStats.overall} className="h-2 mt-4" />
             </CardContent>
           </Card>
           <Card className="shadow-card bg-success/5 border-success/20">
@@ -231,7 +214,7 @@ export default function Attendance() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground">This Month</p>
-                  <p className="text-3xl font-display font-bold text-success">{studentAttendance.thisMonth}%</p>
+                  <p className="text-3xl font-display font-bold text-success">{attendanceStats.thisMonth}%</p>
                 </div>
                 <div className="p-3 rounded-xl bg-success/10">
                   <TrendingUp className="h-6 w-6 text-success" />
@@ -244,10 +227,22 @@ export default function Attendance() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground">Status</p>
-                  <p className="text-xl font-display font-bold text-success">Good Standing</p>
+                  <p className={cn(
+                    "text-xl font-display font-bold",
+                    attendanceStats.overall >= 75 ? "text-success" : "text-destructive"
+                  )}>
+                    {attendanceStats.overall >= 75 ? 'Good Standing' : 'Low Attendance'}
+                  </p>
                 </div>
-                <div className="p-3 rounded-xl bg-success/10">
-                  <Check className="h-6 w-6 text-success" />
+                <div className={cn(
+                  "p-3 rounded-xl",
+                  attendanceStats.overall >= 75 ? "bg-success/10" : "bg-destructive/10"
+                )}>
+                  {attendanceStats.overall >= 75 ? (
+                    <Check className="h-6 w-6 text-success" />
+                  ) : (
+                    <AlertCircle className="h-6 w-6 text-destructive" />
+                  )}
                 </div>
               </div>
             </CardContent>
@@ -261,40 +256,44 @@ export default function Attendance() {
             <CardDescription>Your attendance breakdown by subject</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {studentAttendance.subjects.map((subject) => (
-                <div key={subject.name} className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium">{subject.name}</span>
-                      {subject.percentage < 75 && (
-                        <AlertCircle className="h-4 w-4 text-destructive" />
-                      )}
+            {attendanceStats.subjects.length > 0 ? (
+              <div className="space-y-4">
+                {attendanceStats.subjects.map((subject) => (
+                  <div key={subject.name} className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">{subject.name}</span>
+                        {subject.percentage < 75 && (
+                          <AlertCircle className="h-4 w-4 text-destructive" />
+                        )}
+                      </div>
+                      <div className="text-right">
+                        <span className={cn(
+                          "font-semibold",
+                          subject.percentage >= 90 ? "text-success" : 
+                          subject.percentage >= 75 ? "text-warning" : "text-destructive"
+                        )}>
+                          {subject.percentage}%
+                        </span>
+                        <span className="text-sm text-muted-foreground ml-2">
+                          ({subject.present}/{subject.total} classes)
+                        </span>
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <span className={cn(
-                        "font-semibold",
-                        subject.percentage >= 90 ? "text-success" : 
-                        subject.percentage >= 75 ? "text-warning" : "text-destructive"
-                      )}>
-                        {subject.percentage}%
-                      </span>
-                      <span className="text-sm text-muted-foreground ml-2">
-                        ({subject.present}/{subject.total} classes)
-                      </span>
-                    </div>
+                    <Progress 
+                      value={subject.percentage} 
+                      className={cn(
+                        "h-2",
+                        subject.percentage >= 90 ? "[&>div]:bg-success" : 
+                        subject.percentage >= 75 ? "[&>div]:bg-warning" : "[&>div]:bg-destructive"
+                      )} 
+                    />
                   </div>
-                  <Progress 
-                    value={subject.percentage} 
-                    className={cn(
-                      "h-2",
-                      subject.percentage >= 90 ? "[&>div]:bg-success" : 
-                      subject.percentage >= 75 ? "[&>div]:bg-warning" : "[&>div]:bg-destructive"
-                    )} 
-                  />
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-muted-foreground text-center py-8">No attendance records found</p>
+            )}
           </CardContent>
         </Card>
 
@@ -304,20 +303,24 @@ export default function Attendance() {
             <CardTitle className="font-display">Recent Classes</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
-              {studentAttendance.recentClasses.map((cls, index) => (
-                <div key={index} className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-                  <div className="flex items-center gap-3">
-                    {getStatusIcon(cls.status)}
-                    <div>
-                      <p className="font-medium">{cls.subject}</p>
-                      <p className="text-sm text-muted-foreground">{cls.date}</p>
+            {attendanceStats.recentClasses.length > 0 ? (
+              <div className="space-y-3">
+                {attendanceStats.recentClasses.map((cls, index) => (
+                  <div key={index} className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+                    <div className="flex items-center gap-3">
+                      {getStatusIcon(cls.status)}
+                      <div>
+                        <p className="font-medium">{cls.subject}</p>
+                        <p className="text-sm text-muted-foreground">{cls.date}</p>
+                      </div>
                     </div>
+                    {getStatusBadge(cls.status)}
                   </div>
-                  {getStatusBadge(cls.status)}
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-muted-foreground text-center py-8">No recent attendance records</p>
+            )}
           </CardContent>
         </Card>
       </div>

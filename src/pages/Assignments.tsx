@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useAuth } from '@/hooks/useAuth';
+import { useAssignments, useSubmissions, useClasses, useSubmitAssignment } from '@/hooks/useLMS';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -9,29 +10,54 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { 
   ClipboardList, Clock, Upload, CheckCircle, AlertCircle, 
-  FileText, Calendar, Plus, Search, Filter, Eye
+  FileText, Calendar, Plus, Search, Filter, Eye, Loader2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-
-const studentAssignments = [
-  { id: 1, title: 'DSA Problem Set - Linked Lists', subject: 'Data Structures & Algorithms', dueDate: '2026-01-22', status: 'pending', progress: 60, maxMarks: 100 },
-  { id: 2, title: 'DBMS Lab Report - ER Diagrams', subject: 'Database Management Systems', dueDate: '2026-01-24', status: 'pending', progress: 30, maxMarks: 50 },
-  { id: 3, title: 'OS Process Scheduling Simulation', subject: 'Operating Systems', dueDate: '2026-01-28', status: 'pending', progress: 0, maxMarks: 100 },
-  { id: 4, title: 'Network Protocol Analysis', subject: 'Computer Networks', dueDate: '2026-01-18', status: 'submitted', progress: 100, maxMarks: 50, marks: 45 },
-  { id: 5, title: 'Software Requirements Document', subject: 'Software Engineering', dueDate: '2026-01-15', status: 'graded', progress: 100, maxMarks: 50, marks: 42 },
-  { id: 6, title: 'Binary Search Tree Implementation', subject: 'Data Structures & Algorithms', dueDate: '2026-01-10', status: 'graded', progress: 100, maxMarks: 30, marks: 28 },
-];
-
-const teacherAssignments = [
-  { id: 1, title: 'DSA Problem Set - Linked Lists', class: 'CSE 2nd Year - Sec A', dueDate: '2026-01-22', totalStudents: 65, submitted: 48, graded: 25 },
-  { id: 2, title: 'SQL Queries Assignment', class: 'CSE 2nd Year - Sec B', dueDate: '2026-01-20', totalStudents: 62, submitted: 62, graded: 62 },
-  { id: 3, title: 'UML Diagrams Project', class: 'CSE 3rd Year - Sec A', dueDate: '2026-01-28', totalStudents: 58, submitted: 22, graded: 0 },
-];
+import { toast } from 'sonner';
+import { format, isPast } from 'date-fns';
 
 export default function Assignments() {
-  const { userRole } = useAuth();
+  const { user, userRole } = useAuth();
   const isTeacher = userRole === 'teacher' || userRole === 'admin';
-  const [activeTab, setActiveTab] = useState('pending');
+  
+  const { data: assignments, isLoading: loadingAssignments } = useAssignments();
+  const { data: submissions, isLoading: loadingSubmissions } = useSubmissions(user?.id);
+  const { data: classes } = useClasses();
+  const submitAssignment = useSubmitAssignment();
+
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // Map submissions to assignments for student view
+  const assignmentsWithStatus = useMemo(() => {
+    if (!assignments) return [];
+    
+    return assignments.map(assignment => {
+      const submission = submissions?.find(s => s.assignment_id === assignment.id);
+      let status: 'pending' | 'submitted' | 'graded' | 'overdue' = 'pending';
+      
+      if (submission) {
+        status = submission.marks !== null ? 'graded' : 'submitted';
+      } else if (isPast(new Date(assignment.due_date))) {
+        status = 'overdue';
+      }
+      
+      return {
+        ...assignment,
+        status,
+        submission,
+        subject: assignment.classes?.courses?.name || 'Unknown',
+      };
+    });
+  }, [assignments, submissions]);
+
+  const filteredAssignments = assignmentsWithStatus.filter(a => 
+    a.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    a.subject.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const pendingAssignments = filteredAssignments.filter(a => a.status === 'pending' || a.status === 'overdue');
+  const submittedAssignments = filteredAssignments.filter(a => a.status === 'submitted');
+  const gradedAssignments = filteredAssignments.filter(a => a.status === 'graded');
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -43,11 +69,40 @@ export default function Assignments() {
     }
   };
 
-  const pendingAssignments = studentAssignments.filter(a => a.status === 'pending');
-  const submittedAssignments = studentAssignments.filter(a => a.status === 'submitted');
-  const gradedAssignments = studentAssignments.filter(a => a.status === 'graded');
+  const handleSubmit = async (assignmentId: string) => {
+    if (!user?.id) return;
+    
+    try {
+      await submitAssignment.mutateAsync({
+        assignmentId,
+        studentId: user.id,
+        notes: 'Submitted via LMS'
+      });
+      toast.success('Assignment submitted successfully');
+    } catch (error) {
+      toast.error('Failed to submit assignment');
+    }
+  };
+
+  if (loadingAssignments || loadingSubmissions) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   if (isTeacher) {
+    // Group assignments by class for teacher view
+    const assignmentsByClass = assignments?.reduce((acc, assignment) => {
+      const classId = assignment.class_id;
+      if (!acc[classId]) acc[classId] = [];
+      acc[classId].push(assignment);
+      return acc;
+    }, {} as Record<string, typeof assignments>) || {};
+
     return (
       <DashboardLayout>
         <div className="space-y-6">
@@ -72,8 +127,8 @@ export default function Assignments() {
                     <Clock className="h-5 w-5 text-warning" />
                   </div>
                   <div>
-                    <p className="text-2xl font-bold">23</p>
-                    <p className="text-sm text-muted-foreground">Pending Grading</p>
+                    <p className="text-2xl font-bold">{assignments?.length || 0}</p>
+                    <p className="text-sm text-muted-foreground">Total Assignments</p>
                   </div>
                 </div>
               </CardContent>
@@ -85,8 +140,8 @@ export default function Assignments() {
                     <Upload className="h-5 w-5 text-info" />
                   </div>
                   <div>
-                    <p className="text-2xl font-bold">72</p>
-                    <p className="text-sm text-muted-foreground">Total Submissions</p>
+                    <p className="text-2xl font-bold">{assignments?.filter(a => !isPast(new Date(a.due_date))).length || 0}</p>
+                    <p className="text-sm text-muted-foreground">Active</p>
                   </div>
                 </div>
               </CardContent>
@@ -98,8 +153,8 @@ export default function Assignments() {
                     <CheckCircle className="h-5 w-5 text-success" />
                   </div>
                   <div>
-                    <p className="text-2xl font-bold">47</p>
-                    <p className="text-sm text-muted-foreground">Graded</p>
+                    <p className="text-2xl font-bold">{assignments?.filter(a => isPast(new Date(a.due_date))).length || 0}</p>
+                    <p className="text-sm text-muted-foreground">Completed</p>
                   </div>
                 </div>
               </CardContent>
@@ -110,60 +165,55 @@ export default function Assignments() {
           <Card className="shadow-card">
             <CardHeader>
               <div className="flex items-center justify-between">
-                <CardTitle className="font-display">Active Assignments</CardTitle>
+                <CardTitle className="font-display">All Assignments</CardTitle>
                 <div className="flex items-center gap-2">
                   <div className="relative">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input placeholder="Search assignments..." className="pl-9 w-64" />
+                    <Input 
+                      placeholder="Search assignments..." 
+                      className="pl-9 w-64" 
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                    />
                   </div>
-                  <Button variant="outline" size="icon">
-                    <Filter className="h-4 w-4" />
-                  </Button>
                 </div>
               </div>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                {teacherAssignments.map((assignment) => (
-                  <div key={assignment.id} className="p-4 rounded-lg border hover:shadow-md transition-shadow">
-                    <div className="flex items-start justify-between">
-                      <div className="space-y-1">
+              {assignments && assignments.length > 0 ? (
+                <div className="space-y-4">
+                  {assignments.filter(a => 
+                    a.title.toLowerCase().includes(searchQuery.toLowerCase())
+                  ).map((assignment) => (
+                    <div key={assignment.id} className="p-4 rounded-lg border hover:shadow-md transition-shadow">
+                      <div className="flex items-start justify-between">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <h3 className="font-semibold">{assignment.title}</h3>
+                            <Badge variant="outline">{assignment.classes?.courses?.name}</Badge>
+                          </div>
+                          <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                            <span className="flex items-center gap-1">
+                              <Calendar className="h-4 w-4" />
+                              Due: {format(new Date(assignment.due_date), 'MMM dd, yyyy')}
+                            </span>
+                            <span>Max Marks: {assignment.max_marks}</span>
+                          </div>
+                        </div>
                         <div className="flex items-center gap-2">
-                          <h3 className="font-semibold">{assignment.title}</h3>
-                          <Badge variant="outline">{assignment.class}</Badge>
-                        </div>
-                        <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                          <span className="flex items-center gap-1">
-                            <Calendar className="h-4 w-4" />
-                            Due: {assignment.dueDate}
-                          </span>
+                          <Button variant="outline" size="sm">
+                            <Eye className="h-4 w-4 mr-1" />
+                            View
+                          </Button>
+                          <Button size="sm">Grade</Button>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Button variant="outline" size="sm">
-                          <Eye className="h-4 w-4 mr-1" />
-                          View
-                        </Button>
-                        <Button size="sm">Grade</Button>
-                      </div>
                     </div>
-                    <div className="mt-4 grid grid-cols-3 gap-4">
-                      <div className="text-center p-2 rounded bg-muted/50">
-                        <p className="text-lg font-semibold">{assignment.totalStudents}</p>
-                        <p className="text-xs text-muted-foreground">Total Students</p>
-                      </div>
-                      <div className="text-center p-2 rounded bg-info/10">
-                        <p className="text-lg font-semibold text-info">{assignment.submitted}</p>
-                        <p className="text-xs text-muted-foreground">Submitted</p>
-                      </div>
-                      <div className="text-center p-2 rounded bg-success/10">
-                        <p className="text-lg font-semibold text-success">{assignment.graded}</p>
-                        <p className="text-xs text-muted-foreground">Graded</p>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-muted-foreground text-center py-8">No assignments created yet</p>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -226,92 +276,125 @@ export default function Assignments() {
           </TabsList>
 
           <TabsContent value="pending" className="space-y-4">
-            {pendingAssignments.map((assignment) => (
-              <Card key={assignment.id} className="shadow-card hover:shadow-card-hover transition-shadow">
-                <CardContent className="p-4">
-                  <div className="flex items-start justify-between">
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2">
-                        <Badge variant="secondary">{assignment.subject}</Badge>
-                        <Badge variant="outline" className={getStatusColor(assignment.status)}>
-                          <Clock className="h-3 w-3 mr-1" />
-                          Pending
-                        </Badge>
+            {pendingAssignments.length > 0 ? (
+              pendingAssignments.map((assignment) => (
+                <Card key={assignment.id} className="shadow-card hover:shadow-card-hover transition-shadow">
+                  <CardContent className="p-4">
+                    <div className="flex items-start justify-between">
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <Badge variant="secondary">{assignment.subject}</Badge>
+                          <Badge variant="outline" className={getStatusColor(assignment.status)}>
+                            {assignment.status === 'overdue' ? (
+                              <AlertCircle className="h-3 w-3 mr-1" />
+                            ) : (
+                              <Clock className="h-3 w-3 mr-1" />
+                            )}
+                            {assignment.status === 'overdue' ? 'Overdue' : 'Pending'}
+                          </Badge>
+                        </div>
+                        <h3 className="font-semibold text-lg">{assignment.title}</h3>
+                        <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                          <span className="flex items-center gap-1">
+                            <Calendar className="h-4 w-4" />
+                            Due: {format(new Date(assignment.due_date), 'MMM dd, yyyy')}
+                          </span>
+                          <span>Max Marks: {assignment.max_marks}</span>
+                        </div>
+                        {assignment.description && (
+                          <p className="text-sm text-muted-foreground">{assignment.description}</p>
+                        )}
                       </div>
-                      <h3 className="font-semibold text-lg">{assignment.title}</h3>
-                      <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                        <span className="flex items-center gap-1">
-                          <Calendar className="h-4 w-4" />
-                          Due: {assignment.dueDate}
-                        </span>
-                        <span>Max Marks: {assignment.maxMarks}</span>
-                      </div>
+                      <Button onClick={() => handleSubmit(assignment.id)} disabled={submitAssignment.isPending}>
+                        {submitAssignment.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                        <Upload className="h-4 w-4 mr-2" />
+                        Submit
+                      </Button>
                     </div>
-                    <Button>
-                      <Upload className="h-4 w-4 mr-2" />
-                      Submit
-                    </Button>
-                  </div>
-                  <div className="mt-4">
-                    <div className="flex justify-between text-sm mb-1">
-                      <span>Progress</span>
-                      <span>{assignment.progress}%</span>
-                    </div>
-                    <Progress value={assignment.progress} className="h-2" />
-                  </div>
+                  </CardContent>
+                </Card>
+              ))
+            ) : (
+              <Card className="shadow-card">
+                <CardContent className="p-8 text-center">
+                  <CheckCircle className="h-12 w-12 mx-auto text-success mb-4" />
+                  <p className="text-muted-foreground">No pending assignments</p>
                 </CardContent>
               </Card>
-            ))}
+            )}
           </TabsContent>
 
           <TabsContent value="submitted" className="space-y-4">
-            {submittedAssignments.map((assignment) => (
-              <Card key={assignment.id} className="shadow-card">
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2">
-                        <Badge variant="secondary">{assignment.subject}</Badge>
-                        <Badge variant="outline" className={getStatusColor(assignment.status)}>
-                          <CheckCircle className="h-3 w-3 mr-1" />
-                          Submitted
-                        </Badge>
+            {submittedAssignments.length > 0 ? (
+              submittedAssignments.map((assignment) => (
+                <Card key={assignment.id} className="shadow-card">
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <Badge variant="secondary">{assignment.subject}</Badge>
+                          <Badge variant="outline" className={getStatusColor(assignment.status)}>
+                            <CheckCircle className="h-3 w-3 mr-1" />
+                            Submitted
+                          </Badge>
+                        </div>
+                        <h3 className="font-semibold">{assignment.title}</h3>
+                        <p className="text-sm text-muted-foreground">Awaiting grade</p>
                       </div>
-                      <h3 className="font-semibold">{assignment.title}</h3>
-                      <p className="text-sm text-muted-foreground">Awaiting grade</p>
+                      <Button variant="outline">View Submission</Button>
                     </div>
-                    <Button variant="outline">View Submission</Button>
-                  </div>
+                  </CardContent>
+                </Card>
+              ))
+            ) : (
+              <Card className="shadow-card">
+                <CardContent className="p-8 text-center">
+                  <Upload className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                  <p className="text-muted-foreground">No submitted assignments</p>
                 </CardContent>
               </Card>
-            ))}
+            )}
           </TabsContent>
 
           <TabsContent value="graded" className="space-y-4">
-            {gradedAssignments.map((assignment) => (
-              <Card key={assignment.id} className="shadow-card">
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2">
-                        <Badge variant="secondary">{assignment.subject}</Badge>
-                        <Badge variant="outline" className={getStatusColor(assignment.status)}>
-                          <CheckCircle className="h-3 w-3 mr-1" />
-                          Graded
-                        </Badge>
+            {gradedAssignments.length > 0 ? (
+              gradedAssignments.map((assignment) => (
+                <Card key={assignment.id} className="shadow-card">
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <Badge variant="secondary">{assignment.subject}</Badge>
+                          <Badge variant="outline" className={getStatusColor(assignment.status)}>
+                            <CheckCircle className="h-3 w-3 mr-1" />
+                            Graded
+                          </Badge>
+                        </div>
+                        <h3 className="font-semibold">{assignment.title}</h3>
+                        {assignment.submission?.feedback && (
+                          <p className="text-sm text-muted-foreground">Feedback: {assignment.submission.feedback}</p>
+                        )}
                       </div>
-                      <h3 className="font-semibold">{assignment.title}</h3>
+                      <div className="text-right">
+                        <p className="text-2xl font-bold text-success">
+                          {assignment.submission?.marks}/{assignment.max_marks}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          {Math.round(((assignment.submission?.marks || 0) / assignment.max_marks) * 100)}%
+                        </p>
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <p className="text-2xl font-bold text-success">{assignment.marks}/{assignment.maxMarks}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {Math.round((assignment.marks! / assignment.maxMarks) * 100)}%
-                      </p>
-                    </div>
-                  </div>
+                  </CardContent>
+                </Card>
+              ))
+            ) : (
+              <Card className="shadow-card">
+                <CardContent className="p-8 text-center">
+                  <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                  <p className="text-muted-foreground">No graded assignments yet</p>
                 </CardContent>
               </Card>
-            ))}
+            )}
           </TabsContent>
         </Tabs>
       </div>
