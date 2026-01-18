@@ -21,6 +21,16 @@ import QueryBot from "./pages/QueryBot";
 import CGPACalculator from "./pages/CGPACalculator";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
+// New feature pages
+import ExamSchedule from "./pages/ExamSchedule";
+import AcademicCalendar from "./pages/AcademicCalendar";
+import PreviousPapers from "./pages/PreviousPapers";
+import Announcements from "./pages/Announcements";
+import DiscussionForums from "./pages/DiscussionForums";
+import FacultyFeedback from "./pages/FacultyFeedback";
+import Library from "./pages/Library";
+import LostAndFound from "./pages/LostAndFound";
+import Events from "./pages/Events";
 
 const queryClient = new QueryClient();
 
@@ -60,6 +70,16 @@ const AppRoutes = () => (
     <Route path="/query-bot" element={<ProtectedRoute><QueryBot /></ProtectedRoute>} />
     <Route path="/cgpa-calculator" element={<ProtectedRoute><CGPACalculator /></ProtectedRoute>} />
     <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+    {/* New feature routes */}
+    <Route path="/exam-schedule" element={<ProtectedRoute><ExamSchedule /></ProtectedRoute>} />
+    <Route path="/academic-calendar" element={<ProtectedRoute><AcademicCalendar /></ProtectedRoute>} />
+    <Route path="/previous-papers" element={<ProtectedRoute><PreviousPapers /></ProtectedRoute>} />
+    <Route path="/announcements" element={<ProtectedRoute><Announcements /></ProtectedRoute>} />
+    <Route path="/discussion-forums" element={<ProtectedRoute><DiscussionForums /></ProtectedRoute>} />
+    <Route path="/faculty-feedback" element={<ProtectedRoute><FacultyFeedback /></ProtectedRoute>} />
+    <Route path="/library" element={<ProtectedRoute><Library /></ProtectedRoute>} />
+    <Route path="/lost-and-found" element={<ProtectedRoute><LostAndFound /></ProtectedRoute>} />
+    <Route path="/events" element={<ProtectedRoute><Events /></ProtectedRoute>} />
     <Route path="*" element={<NotFound />} />
   </Routes>
 );
