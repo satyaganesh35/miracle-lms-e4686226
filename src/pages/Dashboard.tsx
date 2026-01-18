@@ -8,6 +8,7 @@ import GradesChart from '@/components/dashboard/GradesChart';
 import UpcomingSchedule from '@/components/dashboard/UpcomingSchedule';
 import QuickActions from '@/components/dashboard/QuickActions';
 import AssignmentsList from '@/components/dashboard/AssignmentsList';
+import DatabaseSeeder from '@/components/dashboard/DatabaseSeeder';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -458,6 +459,11 @@ function AdminDashboard() {
             </div>
           </CardContent>
         </Card>
+      </div>
+
+      {/* Database Seeder */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        <DatabaseSeeder />
       </div>
     </div>
   );
