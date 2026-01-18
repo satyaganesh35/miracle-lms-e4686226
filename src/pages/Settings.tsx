@@ -199,7 +199,13 @@ export default function Settings() {
                 />
               </div>
               <div>
+                {rollNumber && (
+                  <h3 className="font-bold text-xl text-primary">{rollNumber}</h3>
+                )}
                 <h3 className="font-semibold text-lg">{fullName || user?.email}</h3>
+                {department && (
+                  <p className="text-sm text-muted-foreground">{department}</p>
+                )}
                 <p className="text-muted-foreground capitalize">{userRole}</p>
                 <p className="text-xs text-muted-foreground mt-1">Click the camera icon to change photo</p>
               </div>
