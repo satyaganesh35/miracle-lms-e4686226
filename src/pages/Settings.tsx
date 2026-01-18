@@ -1,5 +1,7 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
+import { useProfiles } from '@/hooks/useLMS';
+import { supabase } from '@/integrations/supabase/client';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -7,27 +9,137 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { 
   User, Bell, Shield, Palette, Save, Loader2, 
-  Mail, Phone, Building, Calendar
+  Mail, Phone, Building, Calendar, Camera, GraduationCap
 } from 'lucide-react';
 import { toast } from 'sonner';
 
+const DEPARTMENTS = [
+  { value: 'CSE', label: 'CSE' },
+  { value: 'AI&DS', label: 'AI&DS' },
+  { value: 'EEE', label: 'EEE' },
+  { value: 'ECE', label: 'ECE' },
+  { value: 'MECH', label: 'MECH' },
+];
+
+const SEMESTERS = [
+  { value: '1-1', label: '1-1' },
+  { value: '1-2', label: '1-2' },
+  { value: '2-1', label: '2-1' },
+  { value: '2-2', label: '2-2' },
+  { value: '3-1', label: '3-1' },
+  { value: '3-2', label: '3-2' },
+  { value: '4-1', label: '4-1' },
+  { value: '4-2', label: '4-2' },
+];
+
 export default function Settings() {
   const { user, userRole } = useAuth();
+  const { data: profiles } = useProfiles();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [emailNotifications, setEmailNotifications] = useState(true);
   const [pushNotifications, setPushNotifications] = useState(true);
+  
+  // Form state
+  const [phone, setPhone] = useState('');
+  const [department, setDepartment] = useState('');
+  const [semester, setSemester] = useState('');
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+
+  // Load current user profile
+  const currentProfile = profiles?.find(p => p.id === user?.id);
+  
+  useEffect(() => {
+    if (currentProfile) {
+      setPhone(currentProfile.phone || '');
+      setDepartment(currentProfile.department || '');
+      setSemester(currentProfile.semester || '');
+      setAvatarUrl(currentProfile.avatar_url);
+    }
+  }, [currentProfile]);
 
   const userInitials = user?.email?.substring(0, 2).toUpperCase() || 'U';
 
+  const handleAvatarClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user?.id) return;
+
+    // Validate file
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please select an image file');
+      return;
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error('Image must be less than 2MB');
+      return;
+    }
+
+    setUploading(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${user.id}/avatar.${fileExt}`;
+
+      // Upload to storage
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(fileName, file, { upsert: true });
+
+      if (uploadError) throw uploadError;
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(fileName);
+
+      // Update profile with avatar URL
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ avatar_url: publicUrl })
+        .eq('id', user.id);
+
+      if (updateError) throw updateError;
+
+      setAvatarUrl(publicUrl + '?t=' + Date.now()); // Add timestamp to bust cache
+      toast.success('Profile picture updated');
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to upload image');
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const handleSave = async () => {
+    if (!user?.id) return;
+    
     setSaving(true);
-    // Simulate save
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    setSaving(false);
-    toast.success('Settings saved successfully');
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          phone: phone || null,
+          department: department || null,
+          semester: semester || null,
+        })
+        .eq('id', user.id);
+
+      if (error) throw error;
+      toast.success('Settings saved successfully');
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to save settings');
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -50,14 +162,38 @@ export default function Settings() {
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="flex items-center gap-6">
-              <Avatar className="h-20 w-20">
-                <AvatarFallback className="bg-primary text-primary-foreground text-2xl">
-                  {userInitials}
-                </AvatarFallback>
-              </Avatar>
+              <div className="relative">
+                <Avatar className="h-20 w-20 cursor-pointer" onClick={handleAvatarClick}>
+                  {avatarUrl ? (
+                    <AvatarImage src={avatarUrl} alt="Profile" />
+                  ) : null}
+                  <AvatarFallback className="bg-primary text-primary-foreground text-2xl">
+                    {userInitials}
+                  </AvatarFallback>
+                </Avatar>
+                <button
+                  onClick={handleAvatarClick}
+                  disabled={uploading}
+                  className="absolute bottom-0 right-0 p-1.5 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+                >
+                  {uploading ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Camera className="h-3.5 w-3.5" />
+                  )}
+                </button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleFileChange}
+                  className="hidden"
+                />
+              </div>
               <div>
                 <h3 className="font-semibold text-lg">{user?.email}</h3>
                 <p className="text-muted-foreground capitalize">{userRole}</p>
+                <p className="text-xs text-muted-foreground mt-1">Click the camera icon to change photo</p>
               </div>
             </div>
 
@@ -76,15 +212,51 @@ export default function Settings() {
                   <Phone className="h-4 w-4" />
                   Phone
                 </Label>
-                <Input id="phone" placeholder="Enter phone number" />
+                <Input 
+                  id="phone" 
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="Enter phone number" 
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="department" className="flex items-center gap-2">
                   <Building className="h-4 w-4" />
                   Department
                 </Label>
-                <Input id="department" placeholder="e.g., CSE, ECE" />
+                <Select value={department} onValueChange={setDepartment}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select department" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-background border z-50">
+                    {DEPARTMENTS.map((dept) => (
+                      <SelectItem key={dept.value} value={dept.value}>
+                        {dept.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
+              {userRole === 'student' && (
+                <div className="space-y-2">
+                  <Label htmlFor="semester" className="flex items-center gap-2">
+                    <GraduationCap className="h-4 w-4" />
+                    Semester
+                  </Label>
+                  <Select value={semester} onValueChange={setSemester}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select semester" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-background border z-50">
+                      {SEMESTERS.map((sem) => (
+                        <SelectItem key={sem.value} value={sem.value}>
+                          {sem.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
               <div className="space-y-2">
                 <Label htmlFor="joined" className="flex items-center gap-2">
                   <Calendar className="h-4 w-4" />
