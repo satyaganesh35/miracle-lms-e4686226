@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useAuth } from '@/hooks/useAuth';
-import { useFees } from '@/hooks/useLMS';
+import { useFees, useProfiles, Fee } from '@/hooks/useLMS';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -15,6 +15,7 @@ import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import AddFeeDialog from '@/components/fees/AddFeeDialog';
 import UpdateFeeDialog from '@/components/fees/UpdateFeeDialog';
+import { generateFeeReceipt } from '@/lib/generateFeeReceipt';
 
 export default function Fees() {
   const { user, userRole } = useAuth();
@@ -22,6 +23,19 @@ export default function Fees() {
   
   // For admin, fetch all fees; for students, fetch their own fees
   const { data: fees, isLoading } = useFees(isAdmin ? undefined : user?.id);
+  const { data: profiles } = useProfiles();
+  
+  // Get current user's profile for receipt
+  const currentProfile = profiles?.find(p => p.id === user?.id);
+
+  const handleDownloadReceipt = (fee: Fee, studentId?: string) => {
+    const studentProfile = profiles?.find(p => p.id === (studentId || user?.id));
+    generateFeeReceipt({
+      fee,
+      studentName: studentProfile?.full_name || 'Student',
+      studentEmail: studentProfile?.email || undefined,
+    });
+  };
 
   // Calculate fee statistics
   const feeStats = useMemo(() => {
@@ -182,6 +196,16 @@ export default function Fees() {
                         <p className="text-lg font-semibold">₹{fee.amount.toLocaleString()}</p>
                         {getStatusBadge(fee.status || 'pending')}
                         <UpdateFeeDialog fee={fee} />
+                        {fee.status === 'paid' && (
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            onClick={() => handleDownloadReceipt(fee, fee.student_id)}
+                            title="Download Receipt"
+                          >
+                            <Download className="h-4 w-4" />
+                          </Button>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -312,7 +336,12 @@ export default function Fees() {
                       <p className="text-lg font-semibold">₹{item.amount.toLocaleString()}</p>
                       {getStatusBadge(item.status || 'pending')}
                       {item.status === 'paid' && (
-                        <Button variant="ghost" size="sm">
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          onClick={() => handleDownloadReceipt(item, item.student_id)}
+                          title="Download Receipt"
+                        >
                           <Download className="h-4 w-4" />
                         </Button>
                       )}
