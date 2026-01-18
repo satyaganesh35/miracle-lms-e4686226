@@ -14,6 +14,7 @@ import {
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import AddFeeDialog from '@/components/fees/AddFeeDialog';
+import UpdateFeeDialog from '@/components/fees/UpdateFeeDialog';
 
 export default function Fees() {
   const { user, userRole } = useAuth();
@@ -180,6 +181,7 @@ export default function Fees() {
                       <div className="flex items-center gap-4">
                         <p className="text-lg font-semibold">₹{fee.amount.toLocaleString()}</p>
                         {getStatusBadge(fee.status || 'pending')}
+                        <UpdateFeeDialog fee={fee} />
                       </div>
                     </div>
                   ))}

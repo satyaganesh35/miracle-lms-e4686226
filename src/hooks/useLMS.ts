@@ -599,6 +599,40 @@ export function useAddFee() {
   });
 }
 
+export function useUpdateFeeStatus() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async ({ feeId, status, transactionId }: {
+      feeId: string;
+      status: 'pending' | 'paid' | 'overdue';
+      transactionId?: string | null;
+    }) => {
+      const updateData: {
+        status: string;
+        paid_date: string | null;
+        transaction_id: string | null;
+      } = {
+        status,
+        paid_date: status === 'paid' ? new Date().toISOString() : null,
+        transaction_id: transactionId || null,
+      };
+      
+      const { data, error } = await supabase
+        .from('fees')
+        .update(updateData)
+        .eq('id', feeId)
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['fees'] });
+    },
+  });
+}
+
 // User management mutations
 export function useCreateUser() {
   const queryClient = useQueryClient();
