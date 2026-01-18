@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useAuth } from '@/hooks/useAuth';
+import { useSubmissions, useAssignments, useClasses, useGradeSubmission } from '@/hooks/useLMS';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -9,68 +10,120 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { 
-  BarChart3, TrendingUp, Award, BookOpen, Search, Save
+  BarChart3, TrendingUp, Award, BookOpen, Search, Save, Loader2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 
-const studentGrades = {
-  gpa: 8.7,
-  cgpa: 8.45,
-  rank: 12,
-  totalStudents: 156,
-  subjects: [
-    { name: 'Data Structures & Algorithms', grade: 'A', marks: 92, maxMarks: 100, credits: 4 },
-    { name: 'Database Management Systems', grade: 'A-', marks: 88, maxMarks: 100, credits: 4 },
-    { name: 'Operating Systems', grade: 'B+', marks: 82, maxMarks: 100, credits: 3 },
-    { name: 'Computer Networks', grade: 'A+', marks: 96, maxMarks: 100, credits: 4 },
-    { name: 'Software Engineering', grade: 'A', marks: 90, maxMarks: 100, credits: 3 },
-  ],
-  exams: [
-    { name: 'Mid-Semester Exam', subjects: [
-      { name: 'Data Structures & Algorithms', marks: 45, maxMarks: 50 },
-      { name: 'Database Management Systems', marks: 42, maxMarks: 50 },
-      { name: 'Operating Systems', marks: 38, maxMarks: 50 },
-    ]},
-    { name: 'Internal Assessment 1', subjects: [
-      { name: 'Data Structures & Algorithms', marks: 23, maxMarks: 25 },
-      { name: 'Database Management Systems', marks: 22, maxMarks: 25 },
-      { name: 'Operating Systems', marks: 20, maxMarks: 25 },
-    ]},
-    { name: 'Lab Practical', subjects: [
-      { name: 'Computer Networks Lab', marks: 24, maxMarks: 25 },
-      { name: 'DBMS Lab', marks: 22, maxMarks: 25 },
-    ]},
-  ],
-};
-
-const teacherGradingData = [
-  { id: 1, name: 'Rahul Kumar', rollNo: '101', marks: '' },
-  { id: 2, name: 'Priya Sharma', rollNo: '102', marks: '' },
-  { id: 3, name: 'Amit Patel', rollNo: '103', marks: '' },
-  { id: 4, name: 'Sneha Reddy', rollNo: '104', marks: '' },
-  { id: 5, name: 'Vikram Singh', rollNo: '105', marks: '' },
-];
-
-const getGradeColor = (grade: string) => {
-  if (grade.startsWith('A')) return 'text-success';
-  if (grade.startsWith('B')) return 'text-info';
-  if (grade.startsWith('C')) return 'text-warning';
+const getGradeColor = (percentage: number) => {
+  if (percentage >= 90) return 'text-success';
+  if (percentage >= 80) return 'text-info';
+  if (percentage >= 70) return 'text-warning';
   return 'text-destructive';
 };
 
-export default function Grades() {
-  const { userRole } = useAuth();
-  const isTeacher = userRole === 'teacher' || userRole === 'admin';
-  const [gradingData, setGradingData] = useState(teacherGradingData);
-  const [selectedAssignment, setSelectedAssignment] = useState('assignment1');
+const getGrade = (percentage: number) => {
+  if (percentage >= 90) return 'O';
+  if (percentage >= 80) return 'A+';
+  if (percentage >= 70) return 'A';
+  if (percentage >= 60) return 'B+';
+  if (percentage >= 50) return 'B';
+  if (percentage >= 40) return 'C';
+  return 'F';
+};
 
-  const updateMarks = (studentId: number, marks: string) => {
-    setGradingData(prev => prev.map(s => 
-      s.id === studentId ? { ...s, marks } : s
-    ));
+export default function Grades() {
+  const { user, userRole } = useAuth();
+  const isTeacher = userRole === 'teacher' || userRole === 'admin';
+  
+  const { data: submissions, isLoading: loadingSubmissions } = useSubmissions(user?.id);
+  const { data: assignments, isLoading: loadingAssignments } = useAssignments();
+  const { data: classes } = useClasses();
+  const gradeSubmission = useGradeSubmission();
+
+  const [selectedAssignment, setSelectedAssignment] = useState('');
+  const [gradingData, setGradingData] = useState<Record<string, string>>({});
+
+  // Calculate grade statistics for student view
+  const gradeStats = useMemo(() => {
+    if (!submissions) return { sgpa: 0, totalCredits: 0, subjects: [], exams: [] };
+
+    const gradedSubmissions = submissions.filter(s => s.marks !== null);
+    
+    // Group by subject (assignment's class course)
+    const subjectMap = new Map<string, { totalMarks: number; maxMarks: number; credits: number }>();
+    
+    gradedSubmissions.forEach(sub => {
+      const assignment = assignments?.find(a => a.id === sub.assignment_id);
+      if (!assignment) return;
+      
+      const courseName = assignment.classes?.courses?.name || 'Unknown';
+      const credits = assignment.classes?.courses?.credits || 3;
+      
+      if (!subjectMap.has(courseName)) {
+        subjectMap.set(courseName, { totalMarks: 0, maxMarks: 0, credits });
+      }
+      
+      const stats = subjectMap.get(courseName)!;
+      stats.totalMarks += sub.marks || 0;
+      stats.maxMarks += assignment.max_marks;
+    });
+
+    const subjects = Array.from(subjectMap.entries()).map(([name, stats]) => {
+      const percentage = stats.maxMarks > 0 ? (stats.totalMarks / stats.maxMarks) * 100 : 0;
+      return {
+        name,
+        marks: stats.totalMarks,
+        maxMarks: stats.maxMarks,
+        percentage: Math.round(percentage),
+        grade: getGrade(percentage),
+        credits: stats.credits
+      };
+    });
+
+    // Calculate SGPA
+    let totalGradePoints = 0;
+    let totalCredits = 0;
+    subjects.forEach(sub => {
+      const gradePoint = sub.percentage >= 90 ? 10 : sub.percentage >= 80 ? 9 : sub.percentage >= 70 ? 8 : 
+                         sub.percentage >= 60 ? 7 : sub.percentage >= 50 ? 6 : sub.percentage >= 40 ? 5 : 0;
+      totalGradePoints += gradePoint * sub.credits;
+      totalCredits += sub.credits;
+    });
+
+    const sgpa = totalCredits > 0 ? (totalGradePoints / totalCredits).toFixed(2) : '0.00';
+
+    return { sgpa: parseFloat(sgpa), totalCredits, subjects };
+  }, [submissions, assignments]);
+
+  const handleSaveGrade = async (submissionId: string, marks: number) => {
+    if (!user?.id) return;
+    
+    try {
+      await gradeSubmission.mutateAsync({
+        submissionId,
+        marks,
+        gradedBy: user.id
+      });
+      toast.success('Grade saved successfully');
+    } catch (error) {
+      toast.error('Failed to save grade');
+    }
   };
 
+  if (loadingSubmissions || loadingAssignments) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      </DashboardLayout>
+    );
+  }
+
   if (isTeacher) {
+    const selectedAssignmentData = assignments?.find(a => a.id === selectedAssignment);
+    
     return (
       <DashboardLayout>
         <div className="space-y-6">
@@ -86,80 +139,63 @@ export default function Grades() {
                   <SelectValue placeholder="Select assignment" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="assignment1">DSA Problem Set 5</SelectItem>
-                  <SelectItem value="assignment2">DBMS Lab Report</SelectItem>
-                  <SelectItem value="assignment3">OS Assignment</SelectItem>
+                  {assignments?.map((assignment) => (
+                    <SelectItem key={assignment.id} value={assignment.id}>
+                      {assignment.title}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
           </div>
 
-          {/* Assignment Info */}
-          <Card className="shadow-card">
-            <CardContent className="p-6">
-              <div className="grid gap-6 md:grid-cols-4">
-                <div>
-                  <p className="text-sm text-muted-foreground">Assignment</p>
-                  <p className="font-semibold">DSA Problem Set 5</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Section</p>
-                  <p className="font-semibold">CSE 2nd Year - Sec A</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Max Marks</p>
-                  <p className="font-semibold">100</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Submissions</p>
-                  <p className="font-semibold">28 / 35</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Grading Table */}
-          <Card className="shadow-card">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="font-display">Enter Marks</CardTitle>
-                <Button variant="hero">
-                  <Save className="h-4 w-4 mr-2" />
-                  Save Grades
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {gradingData.map((student) => (
-                  <div key={student.id} className="flex items-center justify-between p-4 rounded-lg border">
-                    <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center font-medium">
-                        {student.name.charAt(0)}
-                      </div>
-                      <div>
-                        <p className="font-medium">{student.name}</p>
-                        <p className="text-sm text-muted-foreground">Roll No: {student.rollNo}</p>
-                      </div>
+          {selectedAssignment && selectedAssignmentData ? (
+            <>
+              {/* Assignment Info */}
+              <Card className="shadow-card">
+                <CardContent className="p-6">
+                  <div className="grid gap-6 md:grid-cols-4">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Assignment</p>
+                      <p className="font-semibold">{selectedAssignmentData.title}</p>
                     </div>
-                    <div className="flex items-center gap-3">
-                      <div className="flex items-center gap-2">
-                        <Input
-                          type="number"
-                          placeholder="Marks"
-                          className="w-24"
-                          value={student.marks}
-                          onChange={(e) => updateMarks(student.id, e.target.value)}
-                        />
-                        <span className="text-muted-foreground">/ 100</span>
-                      </div>
-                      <Button variant="outline" size="sm">View Submission</Button>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Subject</p>
+                      <p className="font-semibold">{selectedAssignmentData.classes?.courses?.name}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Max Marks</p>
+                      <p className="font-semibold">{selectedAssignmentData.max_marks}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Due Date</p>
+                      <p className="font-semibold">{new Date(selectedAssignmentData.due_date).toLocaleDateString()}</p>
                     </div>
                   </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+                </CardContent>
+              </Card>
+
+              {/* Grading Section */}
+              <Card className="shadow-card">
+                <CardHeader>
+                  <CardTitle className="font-display">Enter Marks</CardTitle>
+                  <CardDescription>Grade student submissions for this assignment</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-muted-foreground text-center py-8">
+                    Student submissions will appear here once they submit their work
+                  </p>
+                </CardContent>
+              </Card>
+            </>
+          ) : (
+            <Card className="shadow-card">
+              <CardContent className="p-8 text-center">
+                <BookOpen className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                <p className="text-muted-foreground">Select an assignment to start grading</p>
+              </CardContent>
+            </Card>
+          )}
         </div>
       </DashboardLayout>
     );
@@ -181,7 +217,7 @@ export default function Grades() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground">Current SGPA</p>
-                  <p className="text-3xl font-display font-bold">{studentGrades.gpa}</p>
+                  <p className="text-3xl font-display font-bold">{gradeStats.sgpa}</p>
                 </div>
                 <div className="p-3 rounded-xl bg-primary/10">
                   <BarChart3 className="h-6 w-6 text-primary" />
@@ -193,8 +229,10 @@ export default function Grades() {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground">CGPA</p>
-                  <p className="text-3xl font-display font-bold text-info">{studentGrades.cgpa}</p>
+                  <p className="text-sm text-muted-foreground">Graded Assignments</p>
+                  <p className="text-3xl font-display font-bold text-info">
+                    {submissions?.filter(s => s.marks !== null).length || 0}
+                  </p>
                 </div>
                 <div className="p-3 rounded-xl bg-info/10">
                   <TrendingUp className="h-6 w-6 text-info" />
@@ -206,8 +244,8 @@ export default function Grades() {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground">Class Rank</p>
-                  <p className="text-3xl font-display font-bold text-success">#{studentGrades.rank}</p>
+                  <p className="text-sm text-muted-foreground">Subjects</p>
+                  <p className="text-3xl font-display font-bold text-success">{gradeStats.subjects.length}</p>
                 </div>
                 <div className="p-3 rounded-xl bg-success/10">
                   <Award className="h-6 w-6 text-success" />
@@ -220,7 +258,7 @@ export default function Grades() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground">Total Credits</p>
-                  <p className="text-3xl font-display font-bold">17</p>
+                  <p className="text-3xl font-display font-bold">{gradeStats.totalCredits}</p>
                 </div>
                 <div className="p-3 rounded-xl bg-muted">
                   <BookOpen className="h-6 w-6 text-muted-foreground" />
@@ -230,69 +268,76 @@ export default function Grades() {
           </Card>
         </div>
 
-        {/* Tabs */}
-        <Tabs defaultValue="subjects" className="space-y-4">
-          <TabsList>
-            <TabsTrigger value="subjects">Subject Grades</TabsTrigger>
-            <TabsTrigger value="exams">Exam Results</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="subjects" className="space-y-4">
-            <Card className="shadow-card">
-              <CardHeader>
-                <CardTitle className="font-display">Current Semester Grades</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {studentGrades.subjects.map((subject) => (
-                    <div key={subject.name} className="p-4 rounded-lg border">
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center gap-3">
-                          <span className={cn("text-2xl font-bold", getGradeColor(subject.grade))}>
-                            {subject.grade}
-                          </span>
-                          <div>
-                            <p className="font-semibold">{subject.name}</p>
-                            <p className="text-sm text-muted-foreground">{subject.credits} Credits</p>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-xl font-bold">{subject.marks}/{subject.maxMarks}</p>
-                          <p className="text-sm text-muted-foreground">{subject.marks}%</p>
+        {/* Subject Grades */}
+        <Card className="shadow-card">
+          <CardHeader>
+            <CardTitle className="font-display">Subject Performance</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {gradeStats.subjects.length > 0 ? (
+              <div className="space-y-4">
+                {gradeStats.subjects.map((subject) => (
+                  <div key={subject.name} className="p-4 rounded-lg border">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-3">
+                        <span className={cn("text-2xl font-bold", getGradeColor(subject.percentage))}>
+                          {subject.grade}
+                        </span>
+                        <div>
+                          <p className="font-semibold">{subject.name}</p>
+                          <p className="text-sm text-muted-foreground">{subject.credits} Credits</p>
                         </div>
                       </div>
-                      <Progress value={subject.marks} className="h-2" />
+                      <div className="text-right">
+                        <p className="text-xl font-bold">{subject.marks}/{subject.maxMarks}</p>
+                        <p className="text-sm text-muted-foreground">{subject.percentage}%</p>
+                      </div>
                     </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="exams" className="space-y-4">
-            {studentGrades.exams.map((exam, examIndex) => (
-              <Card key={examIndex} className="shadow-card">
-                <CardHeader>
-                  <CardTitle className="font-display">{exam.name}</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid gap-4 md:grid-cols-3">
-                    {exam.subjects.map((subject, subIndex) => (
-                      <div key={subIndex} className="p-4 rounded-lg bg-muted/50">
-                        <p className="font-medium mb-2">{subject.name}</p>
-                        <div className="flex items-end justify-between">
-                          <p className="text-2xl font-bold">{subject.marks}</p>
-                          <p className="text-sm text-muted-foreground">/ {subject.maxMarks}</p>
-                        </div>
-                        <Progress value={(subject.marks / subject.maxMarks) * 100} className="h-2 mt-2" />
-                      </div>
-                    ))}
+                    <Progress value={subject.percentage} className="h-2" />
                   </div>
-                </CardContent>
-              </Card>
-            ))}
-          </TabsContent>
-        </Tabs>
+                ))}
+              </div>
+            ) : (
+              <p className="text-muted-foreground text-center py-8">No grades available yet</p>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Recent Submissions */}
+        <Card className="shadow-card">
+          <CardHeader>
+            <CardTitle className="font-display">Recent Results</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {submissions && submissions.filter(s => s.marks !== null).length > 0 ? (
+              <div className="space-y-3">
+                {submissions.filter(s => s.marks !== null).slice(0, 10).map((submission) => {
+                  const assignment = assignments?.find(a => a.id === submission.assignment_id);
+                  const percentage = assignment ? (submission.marks! / assignment.max_marks) * 100 : 0;
+                  
+                  return (
+                    <div key={submission.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+                      <div>
+                        <p className="font-medium">{assignment?.title || 'Unknown Assignment'}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {assignment?.classes?.courses?.name}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className={cn("text-lg font-bold", getGradeColor(percentage))}>
+                          {submission.marks}/{assignment?.max_marks}
+                        </p>
+                        <p className="text-sm text-muted-foreground">{Math.round(percentage)}%</p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="text-muted-foreground text-center py-8">No graded submissions yet</p>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </DashboardLayout>
   );
