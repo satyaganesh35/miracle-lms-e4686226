@@ -514,6 +514,7 @@ export type Database = {
           phone: string | null
           regulation: string | null
           role: string
+          roll_number: string | null
           semester: string | null
           updated_at: string
         }
@@ -527,6 +528,7 @@ export type Database = {
           phone?: string | null
           regulation?: string | null
           role?: string
+          roll_number?: string | null
           semester?: string | null
           updated_at?: string
         }
@@ -540,6 +542,7 @@ export type Database = {
           phone?: string | null
           regulation?: string | null
           role?: string
+          roll_number?: string | null
           semester?: string | null
           updated_at?: string
         }
