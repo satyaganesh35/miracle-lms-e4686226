@@ -7,11 +7,21 @@ import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
+import Timetable from "./pages/Timetable";
+import Syllabus from "./pages/Syllabus";
+import Assignments from "./pages/Assignments";
+import Notes from "./pages/Notes";
+import Attendance from "./pages/Attendance";
+import Grades from "./pages/Grades";
+import Notifications from "./pages/Notifications";
+import Fees from "./pages/Fees";
+import Users from "./pages/Users";
+import Upload from "./pages/Upload";
+import QueryBot from "./pages/QueryBot";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
-// Protected Route Component
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   
@@ -34,12 +44,18 @@ const AppRoutes = () => (
   <Routes>
     <Route path="/" element={<Index />} />
     <Route path="/auth" element={<Auth />} />
-    <Route path="/dashboard" element={
-      <ProtectedRoute>
-        <Dashboard />
-      </ProtectedRoute>
-    } />
-    {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+    <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+    <Route path="/timetable" element={<ProtectedRoute><Timetable /></ProtectedRoute>} />
+    <Route path="/syllabus" element={<ProtectedRoute><Syllabus /></ProtectedRoute>} />
+    <Route path="/assignments" element={<ProtectedRoute><Assignments /></ProtectedRoute>} />
+    <Route path="/notes" element={<ProtectedRoute><Notes /></ProtectedRoute>} />
+    <Route path="/attendance" element={<ProtectedRoute><Attendance /></ProtectedRoute>} />
+    <Route path="/grades" element={<ProtectedRoute><Grades /></ProtectedRoute>} />
+    <Route path="/notifications" element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
+    <Route path="/fees" element={<ProtectedRoute><Fees /></ProtectedRoute>} />
+    <Route path="/users" element={<ProtectedRoute><Users /></ProtectedRoute>} />
+    <Route path="/upload" element={<ProtectedRoute><Upload /></ProtectedRoute>} />
+    <Route path="/query-bot" element={<ProtectedRoute><QueryBot /></ProtectedRoute>} />
     <Route path="*" element={<NotFound />} />
   </Routes>
 );
