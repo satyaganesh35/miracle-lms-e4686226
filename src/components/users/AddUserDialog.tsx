@@ -11,11 +11,37 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { UserPlus, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
+const DEPARTMENTS = [
+  { value: 'CSE', label: 'CSE' },
+  { value: 'AI&DS', label: 'AI&DS' },
+  { value: 'EEE', label: 'EEE' },
+  { value: 'ECE', label: 'ECE' },
+  { value: 'MECH', label: 'MECH' },
+];
+
+const SEMESTERS = [
+  { value: '1-1', label: '1-1' },
+  { value: '1-2', label: '1-2' },
+  { value: '2-1', label: '2-1' },
+  { value: '2-2', label: '2-2' },
+  { value: '3-1', label: '3-1' },
+  { value: '3-2', label: '3-2' },
+  { value: '4-1', label: '4-1' },
+  { value: '4-2', label: '4-2' },
+];
+
+const REGULATIONS = [
+  { value: 'R20', label: 'R20' },
+  { value: 'R23', label: 'R23' },
+];
+
 const userSchema = z.object({
   full_name: z.string().min(1, 'Name is required'),
   email: z.string().email('Valid email is required'),
   role: z.enum(['student', 'teacher', 'admin']),
   department: z.string().optional(),
+  semester: z.string().optional(),
+  regulation: z.string().optional(),
   phone: z.string().optional(),
 });
 
@@ -32,9 +58,13 @@ export default function AddUserDialog() {
       email: '',
       role: 'student',
       department: '',
+      semester: '',
+      regulation: '',
       phone: '',
     },
   });
+
+  const watchRole = form.watch('role');
 
   const onSubmit = async (values: UserFormValues) => {
     try {
@@ -43,6 +73,8 @@ export default function AddUserDialog() {
         email: values.email,
         role: values.role,
         department: values.department,
+        semester: values.role === 'student' ? values.semester : undefined,
+        regulation: values.role === 'student' ? values.regulation : undefined,
         phone: values.phone,
       });
       toast.success('User created successfully');
@@ -61,7 +93,7 @@ export default function AddUserDialog() {
           Add New User
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Add New User</DialogTitle>
           <DialogDescription>Create a new user profile in the system</DialogDescription>
@@ -129,17 +161,69 @@ export default function AddUserDialog() {
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent className="bg-background border z-50">
-                      <SelectItem value="Computer Science">Computer Science</SelectItem>
-                      <SelectItem value="Electronics">Electronics</SelectItem>
-                      <SelectItem value="Mechanical">Mechanical</SelectItem>
-                      <SelectItem value="Civil">Civil</SelectItem>
-                      <SelectItem value="Electrical">Electrical</SelectItem>
+                      {DEPARTMENTS.map((dept) => (
+                        <SelectItem key={dept.value} value={dept.value}>
+                          {dept.label}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                   <FormMessage />
                 </FormItem>
               )}
             />
+            {watchRole === 'student' && (
+              <>
+                <FormField
+                  control={form.control}
+                  name="semester"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Semester</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select semester" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent className="bg-background border z-50">
+                          {SEMESTERS.map((sem) => (
+                            <SelectItem key={sem.value} value={sem.value}>
+                              {sem.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="regulation"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Regulation</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select regulation" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent className="bg-background border z-50">
+                          {REGULATIONS.map((reg) => (
+                            <SelectItem key={reg.value} value={reg.value}>
+                              {reg.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </>
+            )}
             <FormField
               control={form.control}
               name="phone"
