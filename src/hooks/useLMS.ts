@@ -644,29 +644,30 @@ export function useCreateUser() {
     mutationFn: async (user: {
       full_name: string;
       email: string;
+      password: string;
       role: 'student' | 'teacher' | 'admin';
       department?: string;
       semester?: string;
       regulation?: string;
       phone?: string;
     }) => {
-      // Create a profile directly (for admin-created users)
-      const { data, error } = await supabase
-        .from('profiles')
-        .insert({
-          id: crypto.randomUUID(),
-          full_name: user.full_name,
+      // Call the edge function to create user with auth
+      const { data, error } = await supabase.functions.invoke('create-user', {
+        body: {
           email: user.email,
+          password: user.password,
+          full_name: user.full_name,
           role: user.role,
           department: user.department || null,
           semester: user.semester || null,
           regulation: user.regulation || null,
           phone: user.phone || null,
-        })
-        .select()
-        .single();
+        },
+      });
+      
       if (error) throw error;
-      return data;
+      if (data?.error) throw new Error(data.error);
+      return data.user;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['profiles'] });

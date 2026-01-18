@@ -38,6 +38,7 @@ const REGULATIONS = [
 const userSchema = z.object({
   full_name: z.string().min(1, 'Name is required'),
   email: z.string().email('Valid email is required'),
+  password: z.string().min(6, 'Password must be at least 6 characters'),
   role: z.enum(['student', 'teacher', 'admin']),
   department: z.string().optional(),
   semester: z.string().optional(),
@@ -56,6 +57,7 @@ export default function AddUserDialog() {
     defaultValues: {
       full_name: '',
       email: '',
+      password: '',
       role: 'student',
       department: '',
       semester: '',
@@ -71,6 +73,7 @@ export default function AddUserDialog() {
       await createUser.mutateAsync({
         full_name: values.full_name,
         email: values.email,
+        password: values.password,
         role: values.role,
         department: values.department,
         semester: values.role === 'student' ? values.semester : undefined,
@@ -121,6 +124,19 @@ export default function AddUserDialog() {
                   <FormLabel>Email</FormLabel>
                   <FormControl>
                     <Input type="email" placeholder="email@example.com" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="password"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Password</FormLabel>
+                  <FormControl>
+                    <Input type="password" placeholder="Enter initial password" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
