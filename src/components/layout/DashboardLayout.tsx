@@ -78,8 +78,8 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
   const roleLabels = {
     admin: 'Administrator',
-    teacher: 'Teacher',
-    student: 'Student',
+    teacher: 'Faculty',
+    student: 'B.Tech Student',
   };
 
   return (
@@ -104,7 +104,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               <GraduationCap className="h-6 w-6 text-accent-foreground" />
             </div>
             <div>
-              <h1 className="font-display font-bold text-sidebar-foreground text-sm">Miracle LMS</h1>
+              <h1 className="font-display font-bold text-sidebar-foreground text-sm">Miracle B.Tech Portal</h1>
               <p className="text-xs text-sidebar-foreground/60">{roleLabels[userRole as keyof typeof roleLabels] || 'User'}</p>
             </div>
             <Button
