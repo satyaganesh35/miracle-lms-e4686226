@@ -60,14 +60,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .from('profiles')
         .select('role')
         .eq('id', userId)
-        .single();
+        .maybeSingle();
       
       if (error) {
         console.error('Error fetching user role:', error);
         return;
       }
       
-      setUserRole(data?.role as UserRole);
+      if (data) {
+        setUserRole(data.role as UserRole);
+      }
     } catch (error) {
       console.error('Error fetching user role:', error);
     }
