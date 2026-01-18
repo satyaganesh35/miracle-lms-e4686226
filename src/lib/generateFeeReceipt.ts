@@ -92,7 +92,7 @@ export function generateFeeReceipt({
   // Table content
   doc.setFont('helvetica', 'normal');
   doc.text(fee.description, margin + 5, yPos);
-  doc.text(`₹${fee.amount.toLocaleString('en-IN')}`, pageWidth - margin - 5, yPos, { align: 'right' });
+  doc.text(`Rs. ${fee.amount.toLocaleString('en-IN')}`, pageWidth - margin - 5, yPos, { align: 'right' });
   
   yPos += 10;
   
@@ -107,7 +107,7 @@ export function generateFeeReceipt({
   doc.setFontSize(12);
   doc.text('Total Paid:', margin + 5, yPos);
   doc.setTextColor(30, 64, 175);
-  doc.text(`₹${fee.amount.toLocaleString('en-IN')}`, pageWidth - margin - 5, yPos, { align: 'right' });
+  doc.text(`Rs. ${fee.amount.toLocaleString('en-IN')}`, pageWidth - margin - 5, yPos, { align: 'right' });
   
   yPos += 20;
   
