@@ -1,4 +1,5 @@
 import { useAuth } from '@/hooks/useAuth';
+import { useAttendance, useAssignments, useSubmissions, useNotifications, useFees, useTimetable } from '@/hooks/useLMS';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import StatsCard from '@/components/dashboard/StatsCard';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -18,42 +19,81 @@ import {
   TrendingUp,
   GraduationCap,
   Upload,
+  Loader2,
 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
-// Student Dashboard Component
 function StudentDashboard() {
+  const { user } = useAuth();
+  const { data: attendance, isLoading: attendanceLoading } = useAttendance(user?.id);
+  const { data: assignments, isLoading: assignmentsLoading } = useAssignments();
+  const { data: submissions } = useSubmissions(user?.id);
+  const { data: notifications } = useNotifications(user?.id);
+  const { data: fees } = useFees(user?.id);
+  const { data: timetable } = useTimetable(user?.id);
+
+  // Calculate attendance percentage
+  const totalClasses = attendance?.length || 0;
+  const presentClasses = attendance?.filter(a => a.status === 'present').length || 0;
+  const attendancePercentage = totalClasses > 0 ? Math.round((presentClasses / totalClasses) * 100) : 0;
+
+  // Get pending assignments
+  const pendingAssignments = assignments?.filter(a => {
+    const submission = submissions?.find(s => s.assignment_id === a.id);
+    return !submission && new Date(a.due_date) > new Date();
+  }) || [];
+
+  // Get unread notifications
+  const unreadNotifications = notifications?.filter(n => !n.read).length || 0;
+
+  // Calculate fee status
+  const totalFees = fees?.reduce((sum, f) => sum + Number(f.amount), 0) || 0;
+  const paidFees = fees?.filter(f => f.status === 'paid').reduce((sum, f) => sum + Number(f.amount), 0) || 0;
+  const pendingFees = totalFees - paidFees;
+
+  // Get today's schedule
+  const today = new Date().toLocaleDateString('en-US', { weekday: 'long' });
+  const todaySchedule = timetable?.filter(t => t.day_of_week === today) || [];
+
+  if (attendanceLoading || assignmentsLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Stats Grid */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <StatsCard
           title="Attendance"
-          value="92%"
+          value={`${attendancePercentage}%`}
           icon={<CheckSquare className="h-6 w-6" />}
-          variant="success"
-          description="This semester"
-          trend={{ value: 3, isPositive: true }}
+          variant={attendancePercentage >= 75 ? "success" : "warning"}
+          description={`${presentClasses}/${totalClasses} classes`}
         />
         <StatsCard
           title="Assignments Due"
-          value="5"
+          value={pendingAssignments.length}
           icon={<ClipboardList className="h-6 w-6" />}
           variant="warning"
-          description="This week"
+          description="Pending submission"
         />
         <StatsCard
-          title="Average Grade"
-          value="A-"
-          icon={<BarChart3 className="h-6 w-6" />}
-          variant="primary"
-          description="Current GPA: 3.7"
-        />
-        <StatsCard
-          title="Courses Enrolled"
-          value="6"
-          icon={<BookOpen className="h-6 w-6" />}
+          title="Notifications"
+          value={unreadNotifications}
+          icon={<Bell className="h-6 w-6" />}
           variant="info"
-          description="Active courses"
+          description="Unread messages"
+        />
+        <StatsCard
+          title="Fee Pending"
+          value={`₹${pendingFees.toLocaleString()}`}
+          icon={<TrendingUp className="h-6 w-6" />}
+          variant={pendingFees > 0 ? "warning" : "success"}
+          description={pendingFees > 0 ? "Due soon" : "All paid"}
         />
       </div>
 
@@ -63,268 +103,231 @@ function StudentDashboard() {
           <CardHeader>
             <CardTitle className="font-display flex items-center gap-2">
               <Calendar className="h-5 w-5 text-primary" />
-              Today's Schedule
+              Today's Schedule ({today})
             </CardTitle>
-            <CardDescription>Your classes for today</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {[
-                { time: '09:00 AM', subject: 'Mathematics', room: 'Room 301', teacher: 'Dr. Sharma' },
-                { time: '10:30 AM', subject: 'Physics', room: 'Lab 102', teacher: 'Prof. Kumar' },
-                { time: '12:00 PM', subject: 'Computer Science', room: 'Room 205', teacher: 'Mrs. Reddy' },
-                { time: '02:00 PM', subject: 'English', room: 'Room 101', teacher: 'Mr. Ravi' },
-              ].map((item, index) => (
-                <div key={index} className="flex items-center gap-4 p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors">
-                  <div className="flex-shrink-0 w-20">
-                    <p className="text-sm font-medium text-primary">{item.time}</p>
+            {todaySchedule.length === 0 ? (
+              <p className="text-muted-foreground text-center py-8">No classes scheduled for today</p>
+            ) : (
+              <div className="space-y-3">
+                {todaySchedule.map((item, index) => (
+                  <div key={index} className="flex items-center gap-4 p-3 rounded-lg bg-muted/50">
+                    <div className="flex-shrink-0 w-20">
+                      <p className="text-sm font-medium text-primary">{item.start_time}</p>
+                    </div>
+                    <div className="flex-1">
+                      <p className="font-medium">{(item.classes as any)?.courses?.name || 'Class'}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {(item.classes as any)?.profiles?.full_name} • {item.room || 'TBA'}
+                      </p>
+                    </div>
+                    <Badge variant="outline">Upcoming</Badge>
                   </div>
-                  <div className="flex-1">
-                    <p className="font-medium">{item.subject}</p>
-                    <p className="text-sm text-muted-foreground">{item.teacher} • {item.room}</p>
-                  </div>
-                  <Badge variant="outline">Upcoming</Badge>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
 
-        {/* Notifications */}
+        {/* Quick Links */}
         <Card className="shadow-card">
           <CardHeader>
-            <CardTitle className="font-display flex items-center gap-2">
-              <Bell className="h-5 w-5 text-primary" />
-              Recent Notifications
-            </CardTitle>
+            <CardTitle className="font-display">Quick Actions</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {[
-                { title: 'Assignment Submitted', desc: 'Math homework graded', time: '2h ago', type: 'success' },
-                { title: 'New Material', desc: 'Physics notes uploaded', time: '5h ago', type: 'info' },
-                { title: 'Fee Reminder', desc: 'Payment due in 5 days', time: '1d ago', type: 'warning' },
-              ].map((item, index) => (
-                <div key={index} className="flex gap-3 p-3 rounded-lg hover:bg-muted/50 transition-colors">
-                  <div className={`mt-1 h-2 w-2 rounded-full flex-shrink-0 ${
-                    item.type === 'success' ? 'bg-success' : 
-                    item.type === 'warning' ? 'bg-warning' : 'bg-info'
-                  }`} />
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">{item.title}</p>
-                    <p className="text-xs text-muted-foreground">{item.desc}</p>
-                    <p className="text-xs text-muted-foreground mt-1">{item.time}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
+          <CardContent className="space-y-2">
+            <Link to="/assignments">
+              <Button variant="outline" className="w-full justify-start gap-2">
+                <ClipboardList className="h-4 w-4" />
+                View Assignments
+              </Button>
+            </Link>
+            <Link to="/attendance">
+              <Button variant="outline" className="w-full justify-start gap-2">
+                <CheckSquare className="h-4 w-4" />
+                Check Attendance
+              </Button>
+            </Link>
+            <Link to="/notes">
+              <Button variant="outline" className="w-full justify-start gap-2">
+                <FileText className="h-4 w-4" />
+                Study Materials
+              </Button>
+            </Link>
+            <Link to="/query-bot">
+              <Button variant="hero" className="w-full justify-start gap-2">
+                <GraduationCap className="h-4 w-4" />
+                Ask AI Assistant
+              </Button>
+            </Link>
           </CardContent>
         </Card>
       </div>
 
       {/* Pending Assignments */}
-      <Card className="shadow-card">
-        <CardHeader>
-          <CardTitle className="font-display flex items-center gap-2">
-            <ClipboardList className="h-5 w-5 text-primary" />
-            Pending Assignments
-          </CardTitle>
-          <CardDescription>Complete these before the deadline</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {[
-              { subject: 'Mathematics', title: 'Calculus Problem Set 5', due: 'Tomorrow', progress: 60 },
-              { subject: 'Physics', title: 'Lab Report - Optics', due: 'In 3 days', progress: 30 },
-              { subject: 'Computer Science', title: 'Python Project', due: 'In 5 days', progress: 0 },
-            ].map((item, index) => (
-              <div key={index} className="p-4 rounded-lg border bg-card hover:shadow-md transition-shadow">
-                <div className="flex items-start justify-between mb-2">
-                  <div>
-                    <Badge variant="secondary" className="mb-2">{item.subject}</Badge>
-                    <p className="font-medium">{item.title}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm text-muted-foreground flex items-center gap-1">
-                      <Clock className="h-4 w-4" />
-                      {item.due}
-                    </p>
-                  </div>
-                </div>
-                <div className="space-y-1">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Progress</span>
-                    <span className="font-medium">{item.progress}%</span>
-                  </div>
-                  <Progress value={item.progress} className="h-2" />
-                </div>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
-
-// Teacher Dashboard Component
-function TeacherDashboard() {
-  return (
-    <div className="space-y-6">
-      {/* Stats Grid */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <StatsCard
-          title="Total Students"
-          value="156"
-          icon={<Users className="h-6 w-6" />}
-          variant="primary"
-          description="Across all classes"
-        />
-        <StatsCard
-          title="Assignments to Grade"
-          value="23"
-          icon={<ClipboardList className="h-6 w-6" />}
-          variant="warning"
-          description="Pending review"
-        />
-        <StatsCard
-          title="Classes Today"
-          value="4"
-          icon={<Calendar className="h-6 w-6" />}
-          variant="info"
-          description="Next: Room 301"
-        />
-        <StatsCard
-          title="Avg. Attendance"
-          value="88%"
-          icon={<CheckSquare className="h-6 w-6" />}
-          variant="success"
-          description="This month"
-        />
-      </div>
-
-      <div className="grid gap-6 lg:grid-cols-2">
-        {/* Quick Actions */}
-        <Card className="shadow-card">
-          <CardHeader>
-            <CardTitle className="font-display">Quick Actions</CardTitle>
-            <CardDescription>Common tasks and actions</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 gap-3">
-              <Button variant="outline" className="h-auto py-4 flex-col gap-2">
-                <CheckSquare className="h-5 w-5 text-primary" />
-                <span>Take Attendance</span>
-              </Button>
-              <Button variant="outline" className="h-auto py-4 flex-col gap-2">
-                <Upload className="h-5 w-5 text-primary" />
-                <span>Upload Notes</span>
-              </Button>
-              <Button variant="outline" className="h-auto py-4 flex-col gap-2">
-                <ClipboardList className="h-5 w-5 text-primary" />
-                <span>Create Assignment</span>
-              </Button>
-              <Button variant="outline" className="h-auto py-4 flex-col gap-2">
-                <BarChart3 className="h-5 w-5 text-primary" />
-                <span>Grade Work</span>
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Pending Grading */}
+      {pendingAssignments.length > 0 && (
         <Card className="shadow-card">
           <CardHeader>
             <CardTitle className="font-display flex items-center gap-2">
-              <FileText className="h-5 w-5 text-primary" />
-              Pending Grading
+              <ClipboardList className="h-5 w-5 text-primary" />
+              Pending Assignments
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {[
-                { class: 'Class 10-A', assignment: 'Math Quiz', submissions: 32, pending: 12 },
-                { class: 'Class 11-B', assignment: 'Physics Lab', submissions: 28, pending: 8 },
-                { class: 'Class 12-A', assignment: 'Final Project', submissions: 25, pending: 3 },
-              ].map((item, index) => (
-                <div key={index} className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-                  <div>
-                    <p className="font-medium">{item.assignment}</p>
-                    <p className="text-sm text-muted-foreground">{item.class}</p>
-                  </div>
-                  <div className="text-right">
-                    <Badge variant={item.pending > 10 ? "destructive" : "secondary"}>
-                      {item.pending} pending
-                    </Badge>
-                    <p className="text-xs text-muted-foreground mt-1">{item.submissions} submitted</p>
+              {pendingAssignments.slice(0, 3).map((assignment) => (
+                <div key={assignment.id} className="p-4 rounded-lg border">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <Badge variant="secondary" className="mb-2">
+                        {(assignment.classes as any)?.courses?.name || 'Course'}
+                      </Badge>
+                      <p className="font-medium">{assignment.title}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm text-muted-foreground flex items-center gap-1">
+                        <Clock className="h-4 w-4" />
+                        {new Date(assignment.due_date).toLocaleDateString()}
+                      </p>
+                      <p className="text-sm font-medium">{assignment.max_marks} marks</p>
+                    </div>
                   </div>
                 </div>
               ))}
             </div>
           </CardContent>
         </Card>
-      </div>
-
-      {/* Today's Classes */}
-      <Card className="shadow-card">
-        <CardHeader>
-          <CardTitle className="font-display flex items-center gap-2">
-            <Calendar className="h-5 w-5 text-primary" />
-            Today's Classes
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            {[
-              { time: '09:00 AM', class: 'Class 10-A', subject: 'Mathematics', room: 'Room 301', students: 35 },
-              { time: '10:30 AM', class: 'Class 11-B', subject: 'Mathematics', room: 'Room 302', students: 32 },
-              { time: '12:00 PM', class: 'Class 12-A', subject: 'Mathematics', room: 'Room 303', students: 28 },
-              { time: '02:00 PM', class: 'Class 10-B', subject: 'Mathematics', room: 'Room 301', students: 34 },
-            ].map((item, index) => (
-              <div key={index} className="p-4 rounded-lg border bg-card hover:shadow-md transition-shadow">
-                <p className="text-sm font-medium text-primary mb-2">{item.time}</p>
-                <p className="font-semibold">{item.class}</p>
-                <p className="text-sm text-muted-foreground">{item.subject}</p>
-                <div className="flex items-center justify-between mt-3 text-sm">
-                  <span className="text-muted-foreground">{item.room}</span>
-                  <Badge variant="outline">{item.students} students</Badge>
-                </div>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+      )}
     </div>
   );
 }
 
-// Admin Dashboard Component
-function AdminDashboard() {
+function TeacherDashboard() {
+  const { data: assignments, isLoading } = useAssignments();
+  const { data: materials } = useMaterials();
+  
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
-      {/* Stats Grid */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <StatsCard
-          title="Total Students"
-          value="2,450"
-          icon={<GraduationCap className="h-6 w-6" />}
+          title="Active Assignments"
+          value={assignments?.length || 0}
+          icon={<ClipboardList className="h-6 w-6" />}
+          variant="primary"
+        />
+        <StatsCard
+          title="Materials Uploaded"
+          value={materials?.length || 0}
+          icon={<FileText className="h-6 w-6" />}
+          variant="info"
+        />
+        <StatsCard
+          title="Classes Today"
+          value="4"
+          icon={<Calendar className="h-6 w-6" />}
+          variant="success"
+        />
+        <StatsCard
+          title="Pending Grading"
+          value="12"
+          icon={<BarChart3 className="h-6 w-6" />}
+          variant="warning"
+        />
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Card className="shadow-card">
+          <CardHeader>
+            <CardTitle className="font-display">Quick Actions</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 gap-3">
+              <Link to="/attendance">
+                <Button variant="outline" className="w-full h-auto py-4 flex-col gap-2">
+                  <CheckSquare className="h-5 w-5 text-primary" />
+                  <span>Take Attendance</span>
+                </Button>
+              </Link>
+              <Link to="/upload">
+                <Button variant="outline" className="w-full h-auto py-4 flex-col gap-2">
+                  <Upload className="h-5 w-5 text-primary" />
+                  <span>Upload Notes</span>
+                </Button>
+              </Link>
+              <Link to="/assignments">
+                <Button variant="outline" className="w-full h-auto py-4 flex-col gap-2">
+                  <ClipboardList className="h-5 w-5 text-primary" />
+                  <span>Assignments</span>
+                </Button>
+              </Link>
+              <Link to="/grades">
+                <Button variant="outline" className="w-full h-auto py-4 flex-col gap-2">
+                  <BarChart3 className="h-5 w-5 text-primary" />
+                  <span>Grade Work</span>
+                </Button>
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-card">
+          <CardHeader>
+            <CardTitle className="font-display">Recent Assignments</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {assignments?.length === 0 ? (
+              <p className="text-muted-foreground text-center py-4">No assignments created yet</p>
+            ) : (
+              <div className="space-y-3">
+                {assignments?.slice(0, 3).map((assignment) => (
+                  <div key={assignment.id} className="p-3 rounded-lg bg-muted/50">
+                    <p className="font-medium">{assignment.title}</p>
+                    <p className="text-sm text-muted-foreground">
+                      Due: {new Date(assignment.due_date).toLocaleDateString()}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+function AdminDashboard() {
+  const { data: notifications } = useNotifications();
+  
+  return (
+    <div className="space-y-6">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <StatsCard
+          title="Total Users"
+          value="2,535"
+          icon={<Users className="h-6 w-6" />}
           variant="primary"
           trend={{ value: 12, isPositive: true }}
-          description="Active enrollments"
         />
         <StatsCard
-          title="Total Teachers"
-          value="85"
-          icon={<Users className="h-6 w-6" />}
-          variant="info"
-          description="Faculty members"
-        />
-        <StatsCard
-          title="Courses"
+          title="Active Courses"
           value="124"
           icon={<BookOpen className="h-6 w-6" />}
           variant="success"
-          description="Active courses"
+        />
+        <StatsCard
+          title="Notifications Sent"
+          value={notifications?.length || 0}
+          icon={<Bell className="h-6 w-6" />}
+          variant="info"
         />
         <StatsCard
           title="Fee Collection"
@@ -332,39 +335,42 @@ function AdminDashboard() {
           icon={<TrendingUp className="h-6 w-6" />}
           variant="warning"
           trend={{ value: 8, isPositive: true }}
-          description="This month"
         />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
-        {/* Quick Actions */}
         <Card className="shadow-card">
           <CardHeader>
             <CardTitle className="font-display">Quick Actions</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
+          <CardContent className="space-y-2">
+            <Link to="/users">
               <Button variant="outline" className="w-full justify-start gap-2">
                 <Users className="h-4 w-4" />
                 Manage Users
               </Button>
+            </Link>
+            <Link to="/notifications">
               <Button variant="outline" className="w-full justify-start gap-2">
                 <Bell className="h-4 w-4" />
                 Send Notification
               </Button>
+            </Link>
+            <Link to="/fees">
               <Button variant="outline" className="w-full justify-start gap-2">
-                <BookOpen className="h-4 w-4" />
-                Add New Course
+                <TrendingUp className="h-4 w-4" />
+                Fee Management
               </Button>
-              <Button variant="outline" className="w-full justify-start gap-2">
-                <BarChart3 className="h-4 w-4" />
-                View Reports
+            </Link>
+            <Link to="/query-bot">
+              <Button variant="hero" className="w-full justify-start gap-2">
+                <GraduationCap className="h-4 w-4" />
+                AI Assistant
               </Button>
-            </div>
+            </Link>
           </CardContent>
         </Card>
 
-        {/* Recent Activity */}
         <Card className="lg:col-span-2 shadow-card">
           <CardHeader>
             <CardTitle className="font-display flex items-center gap-2">
@@ -375,17 +381,14 @@ function AdminDashboard() {
           <CardContent>
             <div className="space-y-4">
               {[
-                { action: 'New student registered', user: 'Rahul Kumar', time: '5 mins ago' },
-                { action: 'Fee payment received', user: 'Priya Sharma', time: '15 mins ago' },
-                { action: 'Course material uploaded', user: 'Dr. Reddy', time: '1 hour ago' },
-                { action: 'Attendance marked', user: 'Prof. Kumar', time: '2 hours ago' },
-                { action: 'New teacher added', user: 'Admin', time: '3 hours ago' },
+                { action: 'System initialized', time: 'Just now' },
+                { action: 'Database connected', time: '1 min ago' },
+                { action: 'AI Chatbot activated', time: '2 mins ago' },
               ].map((item, index) => (
-                <div key={index} className="flex items-center gap-4 p-3 rounded-lg hover:bg-muted/50 transition-colors">
+                <div key={index} className="flex items-center gap-4 p-3 rounded-lg hover:bg-muted/50">
                   <div className="h-2 w-2 rounded-full bg-primary" />
                   <div className="flex-1">
                     <p className="text-sm font-medium">{item.action}</p>
-                    <p className="text-xs text-muted-foreground">by {item.user}</p>
                   </div>
                   <p className="text-xs text-muted-foreground">{item.time}</p>
                 </div>
@@ -394,36 +397,12 @@ function AdminDashboard() {
           </CardContent>
         </Card>
       </div>
-
-      {/* Department Overview */}
-      <Card className="shadow-card">
-        <CardHeader>
-          <CardTitle className="font-display">Department Overview</CardTitle>
-          <CardDescription>Students and faculty distribution</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            {[
-              { name: 'Engineering', students: 850, teachers: 28, color: 'bg-primary' },
-              { name: 'Medical', students: 620, teachers: 22, color: 'bg-success' },
-              { name: 'Commerce', students: 540, teachers: 18, color: 'bg-info' },
-              { name: 'Arts', students: 440, teachers: 17, color: 'bg-warning' },
-            ].map((dept, index) => (
-              <div key={index} className="p-4 rounded-lg border">
-                <div className={`h-1 w-12 rounded-full ${dept.color} mb-3`} />
-                <p className="font-semibold">{dept.name}</p>
-                <div className="mt-2 space-y-1 text-sm text-muted-foreground">
-                  <p>{dept.students} Students</p>
-                  <p>{dept.teachers} Teachers</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 }
+
+// Need to import useMaterials
+import { useMaterials } from '@/hooks/useLMS';
 
 export default function Dashboard() {
   const { userRole, loading } = useAuth();
@@ -432,7 +411,7 @@ export default function Dashboard() {
     return (
       <DashboardLayout>
         <div className="flex items-center justify-center min-h-[60vh]">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+          <Loader2 className="h-12 w-12 animate-spin text-primary" />
         </div>
       </DashboardLayout>
     );
@@ -447,7 +426,8 @@ export default function Dashboard() {
         <div className="flex flex-col items-center justify-center min-h-[60vh] text-center">
           <GraduationCap className="h-16 w-16 text-muted-foreground mb-4" />
           <h2 className="text-2xl font-display font-bold mb-2">Welcome to Miracle LMS</h2>
-          <p className="text-muted-foreground">Your account is being set up. Please wait or contact administrator.</p>
+          <p className="text-muted-foreground mb-4">Your profile is being set up. This may take a moment.</p>
+          <Button onClick={() => window.location.reload()}>Refresh Page</Button>
         </div>
       )}
     </DashboardLayout>

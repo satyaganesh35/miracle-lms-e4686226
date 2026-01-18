@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
+import { useNotifications, useMarkNotificationRead, useSendNotification, useKnowledgeBase } from '@/hooks/useLMS';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -10,30 +11,22 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { 
   Bell, CheckCircle, AlertCircle, Info, Calendar, 
-  MessageSquare, Send, Clock, Check, Trash2
+  MessageSquare, Send, Clock, Check, Trash2, Loader2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-
-const notifications = [
-  { id: 1, type: 'info', title: 'New Assignment Posted', message: 'Calculus Problem Set 5 has been posted. Due date: Jan 20, 2024', time: '2 hours ago', read: false },
-  { id: 2, type: 'success', title: 'Assignment Graded', message: 'Your English essay has been graded. Score: 45/50', time: '5 hours ago', read: false },
-  { id: 3, type: 'warning', title: 'Fee Payment Reminder', message: 'Your semester fee payment is due in 5 days. Please make the payment to avoid late fees.', time: '1 day ago', read: true },
-  { id: 4, type: 'info', title: 'Class Rescheduled', message: 'Physics class on Monday has been rescheduled to Tuesday 10:30 AM', time: '2 days ago', read: true },
-  { id: 5, type: 'success', title: 'Attendance Updated', message: 'Your attendance for this week has been marked. Current attendance: 92%', time: '3 days ago', read: true },
-  { id: 6, type: 'alert', title: 'Low Attendance Warning', message: 'Your attendance in Chemistry is below 75%. Please attend classes regularly.', time: '1 week ago', read: true },
-];
-
-const announcements = [
-  { id: 1, title: 'Annual Day Celebration', message: 'Annual Day will be celebrated on February 15, 2024. All students are requested to participate.', date: 'Jan 15, 2024', from: 'Principal Office' },
-  { id: 2, title: 'Sports Week Schedule', message: 'Sports week will be from Feb 20-25. Register for events by Feb 10.', date: 'Jan 12, 2024', from: 'Sports Department' },
-  { id: 3, title: 'Library Hours Extended', message: 'Library will remain open until 9 PM during exam period (Feb 1-15).', date: 'Jan 10, 2024', from: 'Library' },
-];
+import { useToast } from '@/hooks/use-toast';
 
 export default function Notifications() {
-  const { userRole } = useAuth();
+  const { user, userRole } = useAuth();
+  const { toast } = useToast();
   const isAdmin = userRole === 'admin';
-  const [notificationList, setNotificationList] = useState(notifications);
-  const [newNotification, setNewNotification] = useState({ title: '', message: '', type: 'info' });
+  
+  const { data: notifications, isLoading } = useNotifications(user?.id);
+  const { data: knowledgeBase } = useKnowledgeBase();
+  const markAsRead = useMarkNotificationRead();
+  const sendNotification = useSendNotification();
+  
+  const [newNotification, setNewNotification] = useState<{ title: string; message: string; type: 'info' | 'success' | 'warning' | 'alert' }>({ title: '', message: '', type: 'info' });
 
   const getTypeIcon = (type: string) => {
     switch (type) {
@@ -53,21 +46,51 @@ export default function Notifications() {
     }
   };
 
-  const markAsRead = (id: number) => {
-    setNotificationList(prev => prev.map(n => 
-      n.id === id ? { ...n, read: true } : n
-    ));
+  const handleMarkAsRead = async (id: string) => {
+    await markAsRead.mutateAsync(id);
   };
 
-  const markAllAsRead = () => {
-    setNotificationList(prev => prev.map(n => ({ ...n, read: true })));
+  const handleMarkAllAsRead = async () => {
+    const unread = notifications?.filter(n => !n.read) || [];
+    for (const n of unread) {
+      await markAsRead.mutateAsync(n.id);
+    }
   };
 
-  const deleteNotification = (id: number) => {
-    setNotificationList(prev => prev.filter(n => n.id !== id));
+  const handleSendNotification = async () => {
+    if (!newNotification.title || !newNotification.message) {
+      toast({
+        title: 'Missing information',
+        description: 'Please provide both title and message',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    try {
+      await sendNotification.mutateAsync({
+        title: newNotification.title,
+        message: newNotification.message,
+        type: newNotification.type,
+      });
+      
+      toast({
+        title: 'Notification sent!',
+        description: 'Your notification has been sent to all users',
+      });
+      
+      setNewNotification({ title: '', message: '', type: 'info' });
+    } catch (error) {
+      toast({
+        title: 'Failed to send',
+        description: 'There was an error sending the notification',
+        variant: 'destructive',
+      });
+    }
   };
 
-  const unreadCount = notificationList.filter(n => !n.read).length;
+  const unreadCount = notifications?.filter(n => !n.read).length || 0;
+  const announcements = knowledgeBase?.filter(k => k.category === 'general') || [];
 
   return (
     <DashboardLayout>
@@ -81,7 +104,7 @@ export default function Notifications() {
             </p>
           </div>
           {unreadCount > 0 && (
-            <Button variant="outline" onClick={markAllAsRead}>
+            <Button variant="outline" onClick={handleMarkAllAsRead}>
               <Check className="h-4 w-4 mr-2" />
               Mark all as read
             </Button>
@@ -96,7 +119,7 @@ export default function Notifications() {
                 <Send className="h-5 w-5 text-primary" />
                 Send Notification
               </CardTitle>
-              <CardDescription>Send notifications to students and teachers</CardDescription>
+              <CardDescription>Send notifications to all users</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid gap-4 md:grid-cols-2">
@@ -112,7 +135,9 @@ export default function Notifications() {
                   <label className="text-sm font-medium">Type</label>
                   <Select 
                     value={newNotification.type} 
-                    onValueChange={(value) => setNewNotification(prev => ({ ...prev, type: value }))}
+                    onValueChange={(value: 'info' | 'success' | 'warning' | 'alert') => 
+                      setNewNotification(prev => ({ ...prev, type: value }))
+                    }
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Select type" />
@@ -135,23 +160,18 @@ export default function Notifications() {
                   onChange={(e) => setNewNotification(prev => ({ ...prev, message: e.target.value }))}
                 />
               </div>
-              <div className="flex gap-3">
-                <Select defaultValue="all">
-                  <SelectTrigger className="w-48">
-                    <SelectValue placeholder="Send to" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Users</SelectItem>
-                    <SelectItem value="students">All Students</SelectItem>
-                    <SelectItem value="teachers">All Teachers</SelectItem>
-                    <SelectItem value="class">Specific Class</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Button variant="hero">
+              <Button 
+                variant="hero" 
+                onClick={handleSendNotification}
+                disabled={sendNotification.isPending}
+              >
+                {sendNotification.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                ) : (
                   <Send className="h-4 w-4 mr-2" />
-                  Send Notification
-                </Button>
-              </div>
+                )}
+                Send Notification
+              </Button>
             </CardContent>
           </Card>
         )}
@@ -167,11 +187,17 @@ export default function Notifications() {
                 </span>
               )}
             </TabsTrigger>
-            <TabsTrigger value="announcements">Announcements</TabsTrigger>
+            <TabsTrigger value="announcements">FAQs & Info</TabsTrigger>
           </TabsList>
 
           <TabsContent value="notifications" className="space-y-4">
-            {notificationList.length === 0 ? (
+            {isLoading ? (
+              <Card className="shadow-card">
+                <CardContent className="p-12 text-center">
+                  <Loader2 className="h-8 w-8 animate-spin mx-auto" />
+                </CardContent>
+              </Card>
+            ) : !notifications || notifications.length === 0 ? (
               <Card className="shadow-card">
                 <CardContent className="p-12 text-center">
                   <Bell className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
@@ -180,7 +206,7 @@ export default function Notifications() {
                 </CardContent>
               </Card>
             ) : (
-              notificationList.map((notification) => (
+              notifications.map((notification) => (
                 <Card 
                   key={notification.id} 
                   className={cn(
@@ -194,7 +220,7 @@ export default function Notifications() {
                         {getTypeIcon(notification.type)}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
+                        <div className="flex items-center gap-2 mb-1 flex-wrap">
                           <h3 className={cn("font-semibold", !notification.read && "text-primary")}>
                             {notification.title}
                           </h3>
@@ -207,20 +233,20 @@ export default function Notifications() {
                         <div className="flex items-center gap-4 mt-2">
                           <span className="text-sm text-muted-foreground flex items-center gap-1">
                             <Clock className="h-3 w-3" />
-                            {notification.time}
+                            {new Date(notification.created_at).toLocaleString()}
                           </span>
                         </div>
                       </div>
-                      <div className="flex gap-2">
-                        {!notification.read && (
-                          <Button variant="ghost" size="sm" onClick={() => markAsRead(notification.id)}>
-                            <Check className="h-4 w-4" />
-                          </Button>
-                        )}
-                        <Button variant="ghost" size="sm" onClick={() => deleteNotification(notification.id)}>
-                          <Trash2 className="h-4 w-4 text-muted-foreground" />
+                      {!notification.read && (
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          onClick={() => handleMarkAsRead(notification.id)}
+                          disabled={markAsRead.isPending}
+                        >
+                          <Check className="h-4 w-4" />
                         </Button>
-                      </div>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
@@ -229,28 +255,31 @@ export default function Notifications() {
           </TabsContent>
 
           <TabsContent value="announcements" className="space-y-4">
-            {announcements.map((announcement) => (
-              <Card key={announcement.id} className="shadow-card">
-                <CardContent className="p-4">
-                  <div className="flex items-start gap-4">
-                    <div className="p-2 rounded-lg bg-primary/10">
-                      <MessageSquare className="h-5 w-5 text-primary" />
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <h3 className="font-semibold">{announcement.title}</h3>
-                        <Badge variant="outline">{announcement.from}</Badge>
-                      </div>
-                      <p className="text-muted-foreground">{announcement.message}</p>
-                      <div className="flex items-center gap-1 mt-2 text-sm text-muted-foreground">
-                        <Calendar className="h-3 w-3" />
-                        {announcement.date}
-                      </div>
-                    </div>
-                  </div>
+            {announcements.length === 0 ? (
+              <Card className="shadow-card">
+                <CardContent className="p-12 text-center">
+                  <MessageSquare className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                  <p className="text-lg font-medium">No announcements yet</p>
                 </CardContent>
               </Card>
-            ))}
+            ) : (
+              announcements.map((item) => (
+                <Card key={item.id} className="shadow-card">
+                  <CardContent className="p-4">
+                    <div className="flex items-start gap-4">
+                      <div className="p-2 rounded-lg bg-primary/10">
+                        <MessageSquare className="h-5 w-5 text-primary" />
+                      </div>
+                      <div className="flex-1">
+                        <h3 className="font-semibold mb-2">{item.question}</h3>
+                        <p className="text-muted-foreground">{item.answer}</p>
+                        <Badge variant="outline" className="mt-2">{item.category}</Badge>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))
+            )}
           </TabsContent>
         </Tabs>
       </div>
