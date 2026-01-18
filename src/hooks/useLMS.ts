@@ -643,6 +643,8 @@ export function useCreateUser() {
       email: string;
       role: 'student' | 'teacher' | 'admin';
       department?: string;
+      semester?: string;
+      regulation?: string;
       phone?: string;
     }) => {
       // Create a profile directly (for admin-created users)
@@ -654,6 +656,8 @@ export function useCreateUser() {
           email: user.email,
           role: user.role,
           department: user.department || null,
+          semester: user.semester || null,
+          regulation: user.regulation || null,
           phone: user.phone || null,
         })
         .select()
