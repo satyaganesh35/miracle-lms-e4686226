@@ -14,6 +14,90 @@ export type Database = {
   }
   public: {
     Tables: {
+      academic_calendar: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          department: string | null
+          description: string | null
+          end_date: string | null
+          event_type: string
+          id: string
+          is_holiday: boolean | null
+          start_date: string
+          title: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          department?: string | null
+          description?: string | null
+          end_date?: string | null
+          event_type: string
+          id?: string
+          is_holiday?: boolean | null
+          start_date: string
+          title: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          department?: string | null
+          description?: string | null
+          end_date?: string | null
+          event_type?: string
+          id?: string
+          is_holiday?: boolean | null
+          start_date?: string
+          title?: string
+        }
+        Relationships: []
+      }
+      announcements: {
+        Row: {
+          attachment_url: string | null
+          content: string
+          created_at: string
+          created_by: string
+          expires_at: string | null
+          id: string
+          is_pinned: boolean | null
+          priority: string | null
+          target_audience: string | null
+          target_department: string | null
+          target_semester: string | null
+          title: string
+        }
+        Insert: {
+          attachment_url?: string | null
+          content: string
+          created_at?: string
+          created_by: string
+          expires_at?: string | null
+          id?: string
+          is_pinned?: boolean | null
+          priority?: string | null
+          target_audience?: string | null
+          target_department?: string | null
+          target_semester?: string | null
+          title: string
+        }
+        Update: {
+          attachment_url?: string | null
+          content?: string
+          created_at?: string
+          created_by?: string
+          expires_at?: string | null
+          id?: string
+          is_pinned?: boolean | null
+          priority?: string | null
+          target_audience?: string | null
+          target_department?: string | null
+          target_semester?: string | null
+          title?: string
+        }
+        Relationships: []
+      }
       assignments: {
         Row: {
           class_id: string
@@ -236,6 +320,39 @@ export type Database = {
         }
         Relationships: []
       }
+      discussion_forums: {
+        Row: {
+          class_id: string | null
+          created_at: string
+          created_by: string
+          description: string | null
+          id: string
+          is_locked: boolean | null
+          is_pinned: boolean | null
+          title: string
+        }
+        Insert: {
+          class_id?: string | null
+          created_at?: string
+          created_by: string
+          description?: string | null
+          id?: string
+          is_locked?: boolean | null
+          is_pinned?: boolean | null
+          title: string
+        }
+        Update: {
+          class_id?: string | null
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          id?: string
+          is_locked?: boolean | null
+          is_pinned?: boolean | null
+          title?: string
+        }
+        Relationships: []
+      }
       enrollments: {
         Row: {
           class_id: string
@@ -323,6 +440,197 @@ export type Database = {
           },
         ]
       }
+      event_registrations: {
+        Row: {
+          attendance_marked: boolean | null
+          event_id: string
+          id: string
+          registered_at: string
+          user_id: string
+        }
+        Insert: {
+          attendance_marked?: boolean | null
+          event_id: string
+          id?: string
+          registered_at?: string
+          user_id: string
+        }
+        Update: {
+          attendance_marked?: boolean | null
+          event_id?: string
+          id?: string
+          registered_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_registrations_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      events: {
+        Row: {
+          created_at: string
+          created_by: string
+          department: string | null
+          description: string | null
+          end_datetime: string | null
+          event_type: string
+          id: string
+          image_url: string | null
+          is_featured: boolean | null
+          max_participants: number | null
+          organizer: string | null
+          registration_deadline: string | null
+          registration_required: boolean | null
+          start_datetime: string
+          title: string
+          venue: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          department?: string | null
+          description?: string | null
+          end_datetime?: string | null
+          event_type: string
+          id?: string
+          image_url?: string | null
+          is_featured?: boolean | null
+          max_participants?: number | null
+          organizer?: string | null
+          registration_deadline?: string | null
+          registration_required?: boolean | null
+          start_datetime: string
+          title: string
+          venue?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          department?: string | null
+          description?: string | null
+          end_datetime?: string | null
+          event_type?: string
+          id?: string
+          image_url?: string | null
+          is_featured?: boolean | null
+          max_participants?: number | null
+          organizer?: string | null
+          registration_deadline?: string | null
+          registration_required?: boolean | null
+          start_datetime?: string
+          title?: string
+          venue?: string | null
+        }
+        Relationships: []
+      }
+      exam_schedule: {
+        Row: {
+          course_id: string
+          created_at: string
+          created_by: string
+          department: string | null
+          end_time: string
+          exam_date: string
+          exam_type: string
+          id: string
+          max_marks: number | null
+          regulation: string | null
+          room: string | null
+          semester: string | null
+          start_time: string
+          updated_at: string
+        }
+        Insert: {
+          course_id: string
+          created_at?: string
+          created_by: string
+          department?: string | null
+          end_time: string
+          exam_date: string
+          exam_type: string
+          id?: string
+          max_marks?: number | null
+          regulation?: string | null
+          room?: string | null
+          semester?: string | null
+          start_time: string
+          updated_at?: string
+        }
+        Update: {
+          course_id?: string
+          created_at?: string
+          created_by?: string
+          department?: string | null
+          end_time?: string
+          exam_date?: string
+          exam_type?: string
+          id?: string
+          max_marks?: number | null
+          regulation?: string | null
+          room?: string | null
+          semester?: string | null
+          start_time?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      faculty_feedback: {
+        Row: {
+          academic_year: string | null
+          class_id: string
+          comments: string | null
+          communication: number | null
+          course_content: number | null
+          created_at: string
+          faculty_id: string
+          id: string
+          is_anonymous: boolean | null
+          punctuality: number | null
+          rating: number | null
+          semester: string | null
+          student_id: string
+          teaching_quality: number | null
+        }
+        Insert: {
+          academic_year?: string | null
+          class_id: string
+          comments?: string | null
+          communication?: number | null
+          course_content?: number | null
+          created_at?: string
+          faculty_id: string
+          id?: string
+          is_anonymous?: boolean | null
+          punctuality?: number | null
+          rating?: number | null
+          semester?: string | null
+          student_id: string
+          teaching_quality?: number | null
+        }
+        Update: {
+          academic_year?: string | null
+          class_id?: string
+          comments?: string | null
+          communication?: number | null
+          course_content?: number | null
+          created_at?: string
+          faculty_id?: string
+          id?: string
+          is_anonymous?: boolean | null
+          punctuality?: number | null
+          rating?: number | null
+          semester?: string | null
+          student_id?: string
+          teaching_quality?: number | null
+        }
+        Relationships: []
+      }
       fees: {
         Row: {
           amount: number
@@ -363,6 +671,57 @@ export type Database = {
             columns: ["student_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      forum_posts: {
+        Row: {
+          author_id: string
+          content: string
+          created_at: string
+          forum_id: string
+          id: string
+          is_answer: boolean | null
+          parent_id: string | null
+          updated_at: string
+          upvotes: number | null
+        }
+        Insert: {
+          author_id: string
+          content: string
+          created_at?: string
+          forum_id: string
+          id?: string
+          is_answer?: boolean | null
+          parent_id?: string | null
+          updated_at?: string
+          upvotes?: number | null
+        }
+        Update: {
+          author_id?: string
+          content?: string
+          created_at?: string
+          forum_id?: string
+          id?: string
+          is_answer?: boolean | null
+          parent_id?: string | null
+          updated_at?: string
+          upvotes?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "forum_posts_forum_id_fkey"
+            columns: ["forum_id"]
+            isOneToOne: false
+            referencedRelation: "discussion_forums"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "forum_posts_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "forum_posts"
             referencedColumns: ["id"]
           },
         ]
@@ -413,6 +772,137 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      library_books: {
+        Row: {
+          author: string
+          available_copies: number | null
+          category: string | null
+          cover_url: string | null
+          created_at: string
+          department: string | null
+          id: string
+          isbn: string | null
+          shelf_location: string | null
+          title: string
+          total_copies: number | null
+        }
+        Insert: {
+          author: string
+          available_copies?: number | null
+          category?: string | null
+          cover_url?: string | null
+          created_at?: string
+          department?: string | null
+          id?: string
+          isbn?: string | null
+          shelf_location?: string | null
+          title: string
+          total_copies?: number | null
+        }
+        Update: {
+          author?: string
+          available_copies?: number | null
+          category?: string | null
+          cover_url?: string | null
+          created_at?: string
+          department?: string | null
+          id?: string
+          isbn?: string | null
+          shelf_location?: string | null
+          title?: string
+          total_copies?: number | null
+        }
+        Relationships: []
+      }
+      library_borrowings: {
+        Row: {
+          book_id: string
+          borrowed_at: string
+          due_date: string
+          fine_amount: number | null
+          id: string
+          returned_at: string | null
+          status: string | null
+          student_id: string
+        }
+        Insert: {
+          book_id: string
+          borrowed_at?: string
+          due_date: string
+          fine_amount?: number | null
+          id?: string
+          returned_at?: string | null
+          status?: string | null
+          student_id: string
+        }
+        Update: {
+          book_id?: string
+          borrowed_at?: string
+          due_date?: string
+          fine_amount?: number | null
+          id?: string
+          returned_at?: string | null
+          status?: string | null
+          student_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "library_borrowings_book_id_fkey"
+            columns: ["book_id"]
+            isOneToOne: false
+            referencedRelation: "library_books"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lost_found: {
+        Row: {
+          category: string
+          claimed_by: string | null
+          contact_info: string | null
+          created_at: string
+          date_reported: string
+          description: string | null
+          id: string
+          image_url: string | null
+          item_name: string
+          location: string
+          reported_by: string
+          status: string | null
+          type: string
+        }
+        Insert: {
+          category: string
+          claimed_by?: string | null
+          contact_info?: string | null
+          created_at?: string
+          date_reported?: string
+          description?: string | null
+          id?: string
+          image_url?: string | null
+          item_name: string
+          location: string
+          reported_by: string
+          status?: string | null
+          type: string
+        }
+        Update: {
+          category?: string
+          claimed_by?: string | null
+          contact_info?: string | null
+          created_at?: string
+          date_reported?: string
+          description?: string | null
+          id?: string
+          image_url?: string | null
+          item_name?: string
+          location?: string
+          reported_by?: string
+          status?: string | null
+          type?: string
+        }
+        Relationships: []
       }
       materials: {
         Row: {
@@ -502,6 +992,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      previous_papers: {
+        Row: {
+          course_id: string | null
+          created_at: string
+          exam_type: string
+          exam_year: string
+          file_url: string
+          id: string
+          regulation: string | null
+          title: string
+          uploaded_by: string
+        }
+        Insert: {
+          course_id?: string | null
+          created_at?: string
+          exam_type: string
+          exam_year: string
+          file_url: string
+          id?: string
+          regulation?: string | null
+          title: string
+          uploaded_by: string
+        }
+        Update: {
+          course_id?: string | null
+          created_at?: string
+          exam_type?: string
+          exam_year?: string
+          file_url?: string
+          id?: string
+          regulation?: string | null
+          title?: string
+          uploaded_by?: string
+        }
+        Relationships: []
       }
       profiles: {
         Row: {
@@ -611,6 +1137,48 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      syllabus_progress: {
+        Row: {
+          class_id: string
+          completed_topics: number
+          created_at: string
+          id: string
+          notes: string | null
+          status: string | null
+          total_topics: number
+          unit_number: number
+          unit_title: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          class_id: string
+          completed_topics?: number
+          created_at?: string
+          id?: string
+          notes?: string | null
+          status?: string | null
+          total_topics?: number
+          unit_number: number
+          unit_title: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          class_id?: string
+          completed_topics?: number
+          created_at?: string
+          id?: string
+          notes?: string | null
+          status?: string | null
+          total_topics?: number
+          unit_number?: number
+          unit_title?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
       }
       timetable: {
         Row: {
