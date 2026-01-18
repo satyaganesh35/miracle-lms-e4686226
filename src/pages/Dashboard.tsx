@@ -120,6 +120,7 @@ function StudentDashboard() {
         role="student"
         rollNumber={currentProfile?.roll_number || undefined}
         department={currentProfile?.department || undefined}
+        avatarUrl={currentProfile?.avatar_url}
       />
 
       {/* Stats Grid */}
