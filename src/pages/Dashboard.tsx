@@ -34,12 +34,16 @@ import { Link } from 'react-router-dom';
 
 function StudentDashboard() {
   const { user } = useAuth();
+  const { data: profiles } = useProfiles();
   const { data: attendance, isLoading: attendanceLoading } = useAttendance(user?.id);
   const { data: assignments, isLoading: assignmentsLoading } = useAssignments();
   const { data: submissions } = useSubmissions(user?.id);
   const { data: notifications } = useNotifications(user?.id);
   const { data: fees } = useFees(user?.id);
   const { data: timetable } = useTimetable(user?.id);
+
+  // Get current user profile
+  const currentProfile = profiles?.find(p => p.id === user?.id);
 
   // Calculate attendance stats
   const totalClasses = attendance?.length || 0;
@@ -112,8 +116,10 @@ function StudentDashboard() {
     <div className="space-y-6 animate-fade-in">
       {/* Welcome Card */}
       <WelcomeCard 
-        userName={user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Student'} 
-        role="student" 
+        userName={currentProfile?.full_name || user?.email?.split('@')[0] || 'Student'} 
+        role="student"
+        rollNumber={currentProfile?.roll_number || undefined}
+        department={currentProfile?.department || undefined}
       />
 
       {/* Stats Grid */}
