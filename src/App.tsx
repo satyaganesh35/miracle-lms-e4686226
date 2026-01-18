@@ -19,6 +19,7 @@ import Users from "./pages/Users";
 import Upload from "./pages/Upload";
 import QueryBot from "./pages/QueryBot";
 import CGPACalculator from "./pages/CGPACalculator";
+import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -58,6 +59,7 @@ const AppRoutes = () => (
     <Route path="/upload" element={<ProtectedRoute><Upload /></ProtectedRoute>} />
     <Route path="/query-bot" element={<ProtectedRoute><QueryBot /></ProtectedRoute>} />
     <Route path="/cgpa-calculator" element={<ProtectedRoute><CGPACalculator /></ProtectedRoute>} />
+    <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
     <Route path="*" element={<NotFound />} />
   </Routes>
 );
