@@ -17,21 +17,21 @@ const studentAttendance = {
   overall: 92,
   thisMonth: 95,
   subjects: [
-    { name: 'Mathematics', present: 28, total: 30, percentage: 93 },
-    { name: 'Physics', present: 26, total: 28, percentage: 93 },
-    { name: 'Chemistry', present: 24, total: 26, percentage: 92 },
-    { name: 'Computer Science', present: 22, total: 24, percentage: 92 },
-    { name: 'English', present: 20, total: 22, percentage: 91 },
+    { name: 'Data Structures & Algorithms', present: 28, total: 30, percentage: 93 },
+    { name: 'Database Management Systems', present: 26, total: 28, percentage: 93 },
+    { name: 'Operating Systems', present: 24, total: 26, percentage: 92 },
+    { name: 'Computer Networks', present: 22, total: 24, percentage: 92 },
+    { name: 'Software Engineering', present: 20, total: 22, percentage: 91 },
   ],
   recentClasses: [
-    { date: '2024-01-18', subject: 'Mathematics', status: 'present' },
-    { date: '2024-01-18', subject: 'Physics', status: 'present' },
-    { date: '2024-01-17', subject: 'Chemistry', status: 'present' },
-    { date: '2024-01-17', subject: 'English', status: 'absent' },
-    { date: '2024-01-16', subject: 'Computer Science', status: 'present' },
-    { date: '2024-01-16', subject: 'Mathematics', status: 'present' },
-    { date: '2024-01-15', subject: 'Physics', status: 'late' },
-    { date: '2024-01-15', subject: 'Chemistry', status: 'present' },
+    { date: '2026-01-18', subject: 'Data Structures & Algorithms', status: 'present' },
+    { date: '2026-01-18', subject: 'Database Management Systems', status: 'present' },
+    { date: '2026-01-17', subject: 'Operating Systems', status: 'present' },
+    { date: '2026-01-17', subject: 'Software Engineering', status: 'absent' },
+    { date: '2026-01-16', subject: 'Computer Networks', status: 'present' },
+    { date: '2026-01-16', subject: 'Data Structures & Algorithms', status: 'present' },
+    { date: '2026-01-15', subject: 'Database Management Systems', status: 'late' },
+    { date: '2026-01-15', subject: 'Operating Systems', status: 'present' },
   ],
 };
 
@@ -50,7 +50,7 @@ export default function Attendance() {
   const { userRole } = useAuth();
   const isTeacher = userRole === 'teacher' || userRole === 'admin';
   const [students, setStudents] = useState(classStudents);
-  const [selectedClass, setSelectedClass] = useState('10-A');
+  const [selectedClass, setSelectedClass] = useState('cse-2a');
 
   const toggleAttendance = (studentId: number) => {
     setStudents(prev => prev.map(s => 
@@ -98,11 +98,11 @@ export default function Attendance() {
                   <SelectValue placeholder="Select class" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="10-A">Class 10-A</SelectItem>
-                  <SelectItem value="10-B">Class 10-B</SelectItem>
-                  <SelectItem value="11-A">Class 11-A</SelectItem>
-                  <SelectItem value="11-B">Class 11-B</SelectItem>
-                  <SelectItem value="12-A">Class 12-A</SelectItem>
+                  <SelectItem value="cse-2a">CSE 2nd Year - Sec A</SelectItem>
+                  <SelectItem value="cse-2b">CSE 2nd Year - Sec B</SelectItem>
+                  <SelectItem value="cse-3a">CSE 3rd Year - Sec A</SelectItem>
+                  <SelectItem value="ece-2a">ECE 2nd Year - Sec A</SelectItem>
+                  <SelectItem value="eee-3a">EEE 3rd Year - Sec A</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -156,7 +156,7 @@ export default function Attendance() {
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
-                  <CardTitle className="font-display">Class {selectedClass} - Mathematics</CardTitle>
+                  <CardTitle className="font-display">{selectedClass.toUpperCase().replace('-', ' - Sec ')} - Data Structures</CardTitle>
                   <CardDescription>{new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</CardDescription>
                 </div>
                 <div className="flex gap-2">
