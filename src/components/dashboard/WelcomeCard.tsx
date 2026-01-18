@@ -1,4 +1,5 @@
 import { Card } from '@/components/ui/card';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { GraduationCap, Sparkles } from 'lucide-react';
 
 interface WelcomeCardProps {
@@ -7,9 +8,10 @@ interface WelcomeCardProps {
   rollNumber?: string;
   department?: string;
   greeting?: string;
+  avatarUrl?: string | null;
 }
 
-export default function WelcomeCard({ userName, role, rollNumber, department, greeting }: WelcomeCardProps) {
+export default function WelcomeCard({ userName, role, rollNumber, department, greeting, avatarUrl }: WelcomeCardProps) {
   const getGreeting = () => {
     if (greeting) return greeting;
     const hour = new Date().getHours();
@@ -44,9 +46,18 @@ export default function WelcomeCard({ userName, role, rollNumber, department, gr
       </div>
       <div className="relative p-6 md:p-8">
         <div className="flex items-start gap-4">
-          <div className="p-3 rounded-xl bg-white/10 backdrop-blur-sm">
-            <GraduationCap className="h-8 w-8" />
-          </div>
+          {avatarUrl ? (
+            <Avatar className="h-14 w-14 border-2 border-white/20">
+              <AvatarImage src={avatarUrl} alt={userName} />
+              <AvatarFallback className="bg-white/10 text-primary-foreground text-xl">
+                {userName?.substring(0, 2).toUpperCase() || 'U'}
+              </AvatarFallback>
+            </Avatar>
+          ) : (
+            <div className="p-3 rounded-xl bg-white/10 backdrop-blur-sm">
+              <GraduationCap className="h-8 w-8" />
+            </div>
+          )}
           <div className="flex-1">
             <p className="text-primary-foreground/80 text-sm font-medium">{getGreeting()}</p>
             <h1 className="text-2xl md:text-3xl font-display font-bold mt-1">
