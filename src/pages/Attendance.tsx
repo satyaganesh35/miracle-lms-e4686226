@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useAuth } from '@/hooks/useAuth';
-import { useAttendance, useClasses, useMarkAttendance } from '@/hooks/useLMS';
+import { useAttendance, useMarkAttendance, useProfiles } from '@/hooks/useLMS';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -15,16 +15,48 @@ import {
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
+const DEPARTMENTS = [
+  { value: 'CSE', label: 'CSE' },
+  { value: 'AI&DS', label: 'AI&DS' },
+  { value: 'EEE', label: 'EEE' },
+  { value: 'ECE', label: 'ECE' },
+  { value: 'MECH', label: 'MECH' },
+];
+
+const SEMESTERS = [
+  { value: '1-1', label: '1-1' },
+  { value: '1-2', label: '1-2' },
+  { value: '2-1', label: '2-1' },
+  { value: '2-2', label: '2-2' },
+  { value: '3-1', label: '3-1' },
+  { value: '3-2', label: '3-2' },
+  { value: '4-1', label: '4-1' },
+  { value: '4-2', label: '4-2' },
+];
+
 export default function Attendance() {
   const { user, userRole } = useAuth();
   const isTeacher = userRole === 'teacher' || userRole === 'admin';
   
   const { data: attendanceRecords, isLoading } = useAttendance(user?.id);
-  const { data: classes } = useClasses();
+  const { data: profiles } = useProfiles();
   const markAttendance = useMarkAttendance();
 
-  const [selectedClass, setSelectedClass] = useState<string>('');
+  const [selectedDepartment, setSelectedDepartment] = useState<string>('');
+  const [selectedSemester, setSelectedSemester] = useState<string>('');
   const [attendanceState, setAttendanceState] = useState<Record<string, boolean>>({});
+
+  // Filter students by department and semester
+  const filteredStudents = useMemo(() => {
+    if (!profiles) return [];
+    
+    return profiles.filter(profile => {
+      if (profile.role !== 'student') return false;
+      if (selectedDepartment && profile.department !== selectedDepartment) return false;
+      if (selectedSemester && profile.semester !== selectedSemester) return false;
+      return true;
+    });
+  }, [profiles, selectedDepartment, selectedSemester]);
 
   // Calculate attendance stats for student view
   const attendanceStats = useMemo(() => {
@@ -73,22 +105,34 @@ export default function Attendance() {
     setAttendanceState(prev => ({ ...prev, [studentId]: !prev[studentId] }));
   };
 
-  const handleSaveAttendance = async () => {
-    if (!selectedClass || !user?.id) return;
+  const toggleSelectAll = () => {
+    const allSelected = filteredStudents.every(s => attendanceState[s.id]);
+    const newState: Record<string, boolean> = {};
+    filteredStudents.forEach(s => {
+      newState[s.id] = !allSelected;
+    });
+    setAttendanceState(newState);
+  };
 
-    const records = Object.entries(attendanceState).map(([studentId, present]) => ({
-      studentId,
-      status: present ? 'present' as const : 'absent' as const
+  const handleSaveAttendance = async () => {
+    if (!user?.id || filteredStudents.length === 0) return;
+
+    const records = filteredStudents.map(student => ({
+      studentId: student.id,
+      status: attendanceState[student.id] ? 'present' as const : 'absent' as const
     }));
 
     try {
+      // For now, we'll need a class context - using a placeholder
+      // In a real implementation, you'd associate attendance with department/semester
       await markAttendance.mutateAsync({
-        classId: selectedClass,
+        classId: 'department-attendance', // Placeholder - needs proper handling
         date: new Date().toISOString().split('T')[0],
         records,
         markedBy: user.id
       });
       toast.success('Attendance saved successfully');
+      setAttendanceState({});
     } catch (error) {
       toast.error('Failed to save attendance');
     }
@@ -123,59 +167,127 @@ export default function Attendance() {
   }
 
   if (isTeacher) {
+    const showStudentList = selectedDepartment && selectedSemester;
+    const presentCount = Object.values(attendanceState).filter(Boolean).length;
+    const absentCount = filteredStudents.length - presentCount;
+
     return (
       <DashboardLayout>
         <div className="space-y-6">
           {/* Header */}
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-              <h1 className="text-2xl font-display font-bold">Take Attendance</h1>
-              <p className="text-muted-foreground">Mark attendance for your classes</p>
-            </div>
-            <div className="flex items-center gap-3">
-              <Select value={selectedClass} onValueChange={setSelectedClass}>
-                <SelectTrigger className="w-64">
-                  <SelectValue placeholder="Select class" />
-                </SelectTrigger>
-                <SelectContent>
-                  {classes?.map((cls) => (
-                    <SelectItem key={cls.id} value={cls.id}>
-                      {cls.courses?.name} - {cls.section}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+          <div>
+            <h1 className="text-2xl font-display font-bold">Take Attendance</h1>
+            <p className="text-muted-foreground">Mark attendance by department and semester</p>
           </div>
 
-          {!selectedClass ? (
+          {/* Filters */}
+          <div className="flex flex-col sm:flex-row gap-4">
+            <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
+              <SelectTrigger className="w-full sm:w-48">
+                <SelectValue placeholder="Select Department" />
+              </SelectTrigger>
+              <SelectContent className="bg-background border z-50">
+                {DEPARTMENTS.map((dept) => (
+                  <SelectItem key={dept.value} value={dept.value}>
+                    {dept.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select value={selectedSemester} onValueChange={setSelectedSemester}>
+              <SelectTrigger className="w-full sm:w-48">
+                <SelectValue placeholder="Select Semester" />
+              </SelectTrigger>
+              <SelectContent className="bg-background border z-50">
+                {SEMESTERS.map((sem) => (
+                  <SelectItem key={sem.value} value={sem.value}>
+                    {sem.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {!showStudentList ? (
             <Card className="shadow-card">
               <CardContent className="p-8 text-center">
                 <Users className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                <p className="text-muted-foreground">Select a class to mark attendance</p>
+                <p className="text-muted-foreground">Select department and semester to view students</p>
               </CardContent>
             </Card>
           ) : (
             <Card className="shadow-card">
               <CardHeader>
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                   <div>
-                    <CardTitle className="font-display">Mark Attendance</CardTitle>
-                    <CardDescription>{new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</CardDescription>
+                    <CardTitle className="font-display">
+                      {selectedDepartment} - {selectedSemester}
+                    </CardTitle>
+                    <CardDescription>
+                      {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                    </CardDescription>
                   </div>
-                  <div className="flex gap-2">
-                    <Button variant="hero" onClick={handleSaveAttendance} disabled={markAttendance.isPending}>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <Badge variant="outline" className="bg-success/10 text-success">
+                      Present: {presentCount}
+                    </Badge>
+                    <Badge variant="outline" className="bg-destructive/10 text-destructive">
+                      Absent: {absentCount}
+                    </Badge>
+                    <Button variant="hero" onClick={handleSaveAttendance} disabled={markAttendance.isPending || filteredStudents.length === 0}>
                       {markAttendance.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                       <Save className="h-4 w-4 mr-2" />
-                      Save Attendance
+                      Save
                     </Button>
                   </div>
                 </div>
               </CardHeader>
               <CardContent>
-                <p className="text-muted-foreground text-center py-8">
-                  Student list will be loaded from enrollments for the selected class
-                </p>
+                {filteredStudents.length > 0 ? (
+                  <div className="space-y-2">
+                    {/* Select All */}
+                    <div 
+                      className="flex items-center gap-4 p-3 rounded-lg bg-muted/50 cursor-pointer hover:bg-muted transition-colors"
+                      onClick={toggleSelectAll}
+                    >
+                      <Checkbox 
+                        checked={filteredStudents.length > 0 && filteredStudents.every(s => attendanceState[s.id])}
+                      />
+                      <span className="font-medium">Select All</span>
+                    </div>
+
+                    {/* Student List */}
+                    {filteredStudents.map((student, index) => (
+                      <div 
+                        key={student.id}
+                        className={cn(
+                          "flex items-center gap-4 p-3 rounded-lg cursor-pointer transition-colors",
+                          attendanceState[student.id] 
+                            ? "bg-success/10 border border-success/30" 
+                            : "bg-muted/30 hover:bg-muted/50"
+                        )}
+                        onClick={() => toggleAttendance(student.id)}
+                      >
+                        <Checkbox checked={!!attendanceState[student.id]} />
+                        <span className="w-8 text-muted-foreground">{index + 1}.</span>
+                        <div className="flex-1">
+                          <p className="font-medium">{student.full_name || 'Unknown'}</p>
+                          <p className="text-sm text-muted-foreground">{student.email}</p>
+                        </div>
+                        {attendanceState[student.id] ? (
+                          <Badge className="bg-success/10 text-success border-success/30">Present</Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-muted-foreground">Absent</Badge>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-muted-foreground text-center py-8">
+                    No students found for {selectedDepartment} - {selectedSemester}
+                  </p>
+                )}
               </CardContent>
             </Card>
           )}

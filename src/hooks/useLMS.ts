@@ -547,6 +547,8 @@ export interface Profile {
   email: string | null;
   role: string;
   department: string | null;
+  semester: string | null;
+  regulation: string | null;
   phone: string | null;
   avatar_url: string | null;
   created_at: string;
