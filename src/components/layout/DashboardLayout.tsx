@@ -30,6 +30,7 @@ import {
   MessageSquare,
   Upload,
   CheckSquare,
+  Calculator,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -52,6 +53,7 @@ const navItems: NavItem[] = [
   { label: 'Notes & Materials', icon: <FileText className="h-5 w-5" />, href: '/notes', roles: ['teacher', 'student'] },
   { label: 'Attendance', icon: <CheckSquare className="h-5 w-5" />, href: '/attendance', roles: ['admin', 'teacher', 'student'] },
   { label: 'Grades', icon: <BarChart3 className="h-5 w-5" />, href: '/grades', roles: ['teacher', 'student'] },
+  { label: 'CGPA Calculator', icon: <Calculator className="h-5 w-5" />, href: '/cgpa-calculator', roles: ['student'] },
   { label: 'Notifications', icon: <Bell className="h-5 w-5" />, href: '/notifications', roles: ['admin', 'teacher', 'student'] },
   { label: 'Fee Management', icon: <CreditCard className="h-5 w-5" />, href: '/fees', roles: ['admin', 'student'] },
   { label: 'Manage Users', icon: <Users className="h-5 w-5" />, href: '/users', roles: ['admin'] },
