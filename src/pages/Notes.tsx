@@ -89,14 +89,14 @@ export default function Notes() {
                 />
               </div>
               <div className="flex gap-2 flex-wrap">
-                {subjects.map((subject) => (
+                {types.map((type) => (
                   <Button
-                    key={subject}
-                    variant={selectedSubject === subject ? "default" : "outline"}
+                    key={type}
+                    variant={selectedSubject === type ? "default" : "outline"}
                     size="sm"
-                    onClick={() => setSelectedSubject(subject)}
+                    onClick={() => setSelectedSubject(type)}
                   >
-                    {subject}
+                    {type === 'All' ? 'All' : type.toUpperCase()}
                   </Button>
                 ))}
               </div>
@@ -124,13 +124,11 @@ export default function Notes() {
                         </div>
                         <div className="flex-1 min-w-0">
                           <h3 className="font-semibold truncate">{material.title}</h3>
-                          <div className="flex items-center gap-2 mt-1">
-                            <Badge variant="secondary" className="text-xs">
-                              {material.classes?.courses?.name || 'General'}
-                            </Badge>
-                          </div>
+                          {material.description && (
+                            <p className="text-xs text-muted-foreground mt-1">{material.description}</p>
+                          )}
                           <p className="text-xs text-muted-foreground mt-2">
-                            By {material.profiles?.full_name || 'Unknown'} • {format(new Date(material.created_at), 'MMM dd, yyyy')}
+                            {format(new Date(material.created_at), 'MMM dd, yyyy')}
                           </p>
                         </div>
                       </div>
@@ -178,13 +176,11 @@ export default function Notes() {
                         </div>
                         <div className="flex-1 min-w-0">
                           <h3 className="font-semibold truncate">{material.title}</h3>
-                          <div className="flex items-center gap-2 mt-1">
-                            <Badge variant="secondary" className="text-xs">
-                              {material.classes?.courses?.name || 'General'}
-                            </Badge>
-                          </div>
+                          {material.description && (
+                            <p className="text-xs text-muted-foreground mt-1">{material.description}</p>
+                          )}
                           <p className="text-xs text-muted-foreground mt-2">
-                            By {material.profiles?.full_name || 'Unknown'} • {format(new Date(material.created_at), 'MMM dd, yyyy')}
+                            {format(new Date(material.created_at), 'MMM dd, yyyy')}
                           </p>
                         </div>
                       </div>
@@ -227,7 +223,7 @@ export default function Notes() {
                           )}
                           <div className="flex items-center gap-2 mt-2">
                             <Badge variant="secondary">
-                              {material.classes?.courses?.name || 'General'}
+                              {material.type}
                             </Badge>
                           </div>
                         </div>
