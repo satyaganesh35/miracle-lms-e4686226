@@ -13,7 +13,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { 
   User, Bell, Shield, Palette, Save, Loader2, 
-  Mail, Phone, Building, Calendar, Camera, GraduationCap
+  Mail, Phone, Building, Calendar, Camera, GraduationCap, Hash
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -50,6 +50,7 @@ export default function Settings() {
   const [phone, setPhone] = useState('');
   const [department, setDepartment] = useState('');
   const [semester, setSemester] = useState('');
+  const [rollNumber, setRollNumber] = useState('');
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
 
   // Load current user profile
@@ -60,6 +61,7 @@ export default function Settings() {
       setPhone(currentProfile.phone || '');
       setDepartment(currentProfile.department || '');
       setSemester(currentProfile.semester || '');
+      setRollNumber(currentProfile.roll_number || '');
       setAvatarUrl(currentProfile.avatar_url);
     }
   }, [currentProfile]);
@@ -130,6 +132,7 @@ export default function Settings() {
           phone: phone || null,
           department: department || null,
           semester: semester || null,
+          roll_number: rollNumber || null,
         })
         .eq('id', user.id);
 
@@ -207,6 +210,20 @@ export default function Settings() {
                 </Label>
                 <Input id="email" value={user?.email || ''} disabled className="bg-muted" />
               </div>
+              {userRole === 'student' && (
+                <div className="space-y-2">
+                  <Label htmlFor="rollNumber" className="flex items-center gap-2">
+                    <Hash className="h-4 w-4" />
+                    Roll Number
+                  </Label>
+                  <Input 
+                    id="rollNumber" 
+                    value={rollNumber}
+                    onChange={(e) => setRollNumber(e.target.value.toUpperCase())}
+                    placeholder="e.g., 22A91A6101" 
+                  />
+                </div>
+              )}
               <div className="space-y-2">
                 <Label htmlFor="phone" className="flex items-center gap-2">
                   <Phone className="h-4 w-4" />

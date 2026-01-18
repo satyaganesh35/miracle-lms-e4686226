@@ -549,6 +549,7 @@ export interface Profile {
   department: string | null;
   semester: string | null;
   regulation: string | null;
+  roll_number: string | null;
   phone: string | null;
   avatar_url: string | null;
   created_at: string;
