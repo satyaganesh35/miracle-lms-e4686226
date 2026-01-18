@@ -13,7 +13,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { 
   User, Bell, Shield, Palette, Save, Loader2, 
-  Mail, Phone, Building, Calendar, Camera, GraduationCap, Hash
+  Mail, Phone, Building, Calendar, Camera, GraduationCap, Hash, UserCircle
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -47,6 +47,7 @@ export default function Settings() {
   const [pushNotifications, setPushNotifications] = useState(true);
   
   // Form state
+  const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
   const [department, setDepartment] = useState('');
   const [semester, setSemester] = useState('');
@@ -58,6 +59,7 @@ export default function Settings() {
   
   useEffect(() => {
     if (currentProfile) {
+      setFullName(currentProfile.full_name || '');
       setPhone(currentProfile.phone || '');
       setDepartment(currentProfile.department || '');
       setSemester(currentProfile.semester || '');
@@ -66,7 +68,9 @@ export default function Settings() {
     }
   }, [currentProfile]);
 
-  const userInitials = user?.email?.substring(0, 2).toUpperCase() || 'U';
+  const userInitials = fullName 
+    ? fullName.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2)
+    : user?.email?.substring(0, 2).toUpperCase() || 'U';
 
   const handleAvatarClick = () => {
     fileInputRef.current?.click();
@@ -129,6 +133,7 @@ export default function Settings() {
       const { error } = await supabase
         .from('profiles')
         .update({
+          full_name: fullName || null,
           phone: phone || null,
           department: department || null,
           semester: semester || null,
@@ -194,7 +199,7 @@ export default function Settings() {
                 />
               </div>
               <div>
-                <h3 className="font-semibold text-lg">{user?.email}</h3>
+                <h3 className="font-semibold text-lg">{fullName || user?.email}</h3>
                 <p className="text-muted-foreground capitalize">{userRole}</p>
                 <p className="text-xs text-muted-foreground mt-1">Click the camera icon to change photo</p>
               </div>
@@ -203,6 +208,18 @@ export default function Settings() {
             <Separator />
 
             <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="fullName" className="flex items-center gap-2">
+                  <UserCircle className="h-4 w-4" />
+                  Full Name
+                </Label>
+                <Input 
+                  id="fullName" 
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  placeholder="Enter your full name" 
+                />
+              </div>
               <div className="space-y-2">
                 <Label htmlFor="email" className="flex items-center gap-2">
                   <Mail className="h-4 w-4" />
