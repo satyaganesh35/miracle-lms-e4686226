@@ -90,6 +90,7 @@ export interface ScheduleConstraints {
   maxTheoryPerFacultyPerDay: number;
   maxContinuousTheory: number;
   minFreePeriodPerFacultyPerDay: number;
+  maxPeriodsPerSubjectPerDay: number; // New: limit same subject per day
   preferLabsInAfternoon: boolean;
   avoidTheoryAroundLabs: boolean;
   distributeWorkloadEvenly: boolean;
@@ -101,6 +102,7 @@ export const DEFAULT_CONSTRAINTS: ScheduleConstraints = {
   maxTheoryPerFacultyPerDay: 3,
   maxContinuousTheory: 2,
   minFreePeriodPerFacultyPerDay: 1,
+  maxPeriodsPerSubjectPerDay: 2, // Max 2 periods of same subject per day
   preferLabsInAfternoon: true,
   avoidTheoryAroundLabs: true,
   distributeWorkloadEvenly: true,
@@ -285,6 +287,29 @@ class RoomScheduleTracker {
   }
 }
 
+// Track subject (class) schedules per day - to enforce max periods per subject per day
+class SubjectScheduleTracker {
+  private subjectPeriodsPerDay: Map<string, Map<DayOfWeek, number>> = new Map();
+
+  getPeriodsForSubject(classId: string, day: DayOfWeek): number {
+    if (!this.subjectPeriodsPerDay.has(classId)) return 0;
+    return this.subjectPeriodsPerDay.get(classId)!.get(day) || 0;
+  }
+
+  canAssign(classId: string, day: DayOfWeek, periodsToAdd: number, maxPerDay: number): boolean {
+    const current = this.getPeriodsForSubject(classId, day);
+    return (current + periodsToAdd) <= maxPerDay;
+  }
+
+  assignPeriods(classId: string, day: DayOfWeek, periods: number): void {
+    if (!this.subjectPeriodsPerDay.has(classId)) {
+      this.subjectPeriodsPerDay.set(classId, new Map());
+    }
+    const current = this.subjectPeriodsPerDay.get(classId)!.get(day) || 0;
+    this.subjectPeriodsPerDay.get(classId)!.set(day, current + periods);
+  }
+}
+
 // Main class slot tracker
 class SlotTracker {
   private usedSlots: Map<DayOfWeek, Set<number>> = new Map();
@@ -417,6 +442,7 @@ export function generateOptimizedTimetable(
   const slotTracker = new SlotTracker();
   const facultyTracker = new FacultyScheduleTracker();
   const roomTracker = new RoomScheduleTracker();
+  const subjectTracker = new SubjectScheduleTracker(); // Track subject periods per day
   
   // Mark existing slots
   slotTracker.markExistingSchedule(existingTimetable);
@@ -460,6 +486,9 @@ export function generateOptimizedTimetable(
         // Check faculty availability
         if (!facultyTracker.canAssign(teacherId, day, pair, true, constraints)) continue;
         
+        // Check subject-per-day constraint (labs count as 2 periods)
+        if (!subjectTracker.canAssign(lab.id, day, 2, constraints.maxPeriodsPerSubjectPerDay)) continue;
+        
         // Find available lab room
         const room = roomTracker.getAvailableRoom(LABS, day, pair);
         if (!room) continue;
@@ -468,6 +497,7 @@ export function generateOptimizedTimetable(
         slotTracker.markUsed(day, pair);
         facultyTracker.assignSlot(teacherId, day, pair, true);
         roomTracker.assignSlot(room, day, pair);
+        subjectTracker.assignPeriods(lab.id, day, 2); // Track lab periods
         
         schedule.push({
           class_id: lab.id,
@@ -530,6 +560,11 @@ export function generateOptimizedTimetable(
         continue; // Need at least one free period after this assignment
       }
       
+      // Check subject-per-day constraint before trying this day
+      if (!subjectTracker.canAssign(classItem.id, day, 1, constraints.maxPeriodsPerSubjectPerDay)) {
+        continue; // Already at max periods for this subject today
+      }
+      
       // Get available slots (prefer morning for core subjects)
       let availableSlots: number[];
       if (preferMorning && constraints.coreSubjectsInMorning) {
@@ -558,6 +593,9 @@ export function generateOptimizedTimetable(
       for (const slotIdx of availableSlots) {
         if (assignedCount >= classItem.classesPerWeek) break;
         
+        // Re-check subject constraint (in case we already assigned one this day in this loop)
+        if (!subjectTracker.canAssign(classItem.id, day, 1, constraints.maxPeriodsPerSubjectPerDay)) break;
+        
         // Check faculty can take this slot
         if (!facultyTracker.canAssign(teacherId, day, [slotIdx], false, constraints)) continue;
         
@@ -569,6 +607,7 @@ export function generateOptimizedTimetable(
         slotTracker.markUsed(day, [slotIdx]);
         facultyTracker.assignSlot(teacherId, day, [slotIdx], false);
         roomTracker.assignSlot(room, day, [slotIdx]);
+        subjectTracker.assignPeriods(classItem.id, day, 1); // Track subject period
         
         schedule.push({
           class_id: classItem.id,
@@ -667,6 +706,7 @@ export function generateOptimizedTimetable(
   });
 
   justification.push(`📊 Faculty constraints: Max ${constraints.maxTheoryPerFacultyPerDay} theory/day, ≤${constraints.maxContinuousTheory} continuous`);
+  justification.push(`📊 Subject constraint: Max ${constraints.maxPeriodsPerSubjectPerDay} periods of same subject per day`);
   justification.push(`✅ Generated ${schedule.length} total time slots`);
 
   return {
