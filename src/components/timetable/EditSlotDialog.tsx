@@ -4,8 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Clock, MapPin, Calendar } from 'lucide-react';
-import { DAYS, TIME_SLOTS, ROOMS, LABS, type DayOfWeek, type GeneratedSlot } from '@/lib/timetableScheduler';
+import { Clock, Calendar } from 'lucide-react';
+import { DAYS, TIME_SLOTS, type DayOfWeek, type GeneratedSlot } from '@/lib/timetableScheduler';
 
 interface EditSlotDialogProps {
   open: boolean;
@@ -24,21 +24,18 @@ export default function EditSlotDialog({
 }: EditSlotDialogProps) {
   const [selectedDay, setSelectedDay] = useState<DayOfWeek>('Monday');
   const [selectedStartSlot, setSelectedStartSlot] = useState<number>(0);
-  const [selectedRoom, setSelectedRoom] = useState<string>('');
 
   useEffect(() => {
     if (slot) {
       setSelectedDay(slot.day_of_week);
       const startSlotIndex = TIME_SLOTS.findIndex(s => s.start === slot.start_time);
       setSelectedStartSlot(startSlotIndex !== -1 ? startSlotIndex : 0);
-      setSelectedRoom(slot.room);
     }
   }, [slot]);
 
   if (!slot) return null;
 
   const isLab = slot.isLab;
-  const roomOptions = isLab ? LABS : ROOMS;
 
   // Get available time slots (exclude lunch and check conflicts)
   const getAvailableTimeSlots = () => {
@@ -106,7 +103,6 @@ export default function EditSlotDialog({
       day_of_week: selectedDay,
       start_time: startTimeSlot.start,
       end_time: endTimeSlot.end,
-      room: selectedRoom,
       slotIndices,
     };
     
@@ -180,24 +176,6 @@ export default function EditSlotDialog({
                     </SelectItem>
                   );
                 })}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Room Selection */}
-          <div className="space-y-2">
-            <Label className="flex items-center gap-2">
-              <MapPin className="h-4 w-4" />
-              {isLab ? 'Lab' : 'Room'}
-            </Label>
-            <Select value={selectedRoom} onValueChange={setSelectedRoom}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {roomOptions.map(room => (
-                  <SelectItem key={room} value={room}>{room}</SelectItem>
-                ))}
               </SelectContent>
             </Select>
           </div>

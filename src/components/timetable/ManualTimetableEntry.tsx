@@ -52,7 +52,6 @@ interface EditingEntry {
   day_of_week: string;
   start_time: string;
   end_time: string;
-  room: string;
 }
 
 export default function ManualTimetableEntry() {
@@ -63,16 +62,22 @@ export default function ManualTimetableEntry() {
   const [classId, setClassId] = useState('');
   const [dayOfWeek, setDayOfWeek] = useState('');
   const [selectedPeriod, setSelectedPeriod] = useState('');
-  const [room, setRoom] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [editingEntry, setEditingEntry] = useState<EditingEntry | null>(null);
+  
+  // Custom subject entry
+  const [useCustomSubject, setUseCustomSubject] = useState(false);
+  const [customSubjectName, setCustomSubjectName] = useState('');
+  const [customSubjectCode, setCustomSubjectCode] = useState('');
 
   const resetForm = () => {
     setClassId('');
     setDayOfWeek('');
     setSelectedPeriod('');
-    setRoom('');
     setEditingEntry(null);
+    setUseCustomSubject(false);
+    setCustomSubjectName('');
+    setCustomSubjectCode('');
   };
 
   // Get time from selected period
@@ -88,8 +93,13 @@ export default function ManualTimetableEntry() {
   };
 
   const handleAddEntry = async () => {
-    if (!classId || !dayOfWeek || !selectedPeriod) {
+    if ((!classId && !useCustomSubject) || !dayOfWeek || !selectedPeriod) {
       toast.error('Please fill all required fields');
+      return;
+    }
+    
+    if (useCustomSubject && (!customSubjectName || !customSubjectCode)) {
+      toast.error('Please enter subject name and code');
       return;
     }
 
@@ -109,7 +119,7 @@ export default function ManualTimetableEntry() {
           day_of_week: dayOfWeek,
           start_time: times.start,
           end_time: times.end,
-          room: room || null,
+          room: null,
         });
 
       if (error) throw error;
@@ -143,7 +153,6 @@ export default function ManualTimetableEntry() {
           day_of_week: editingEntry.day_of_week,
           start_time: editingEntry.start_time,
           end_time: editingEntry.end_time,
-          room: editingEntry.room || null,
         })
         .eq('id', editingEntry.id);
 
@@ -186,7 +195,6 @@ export default function ManualTimetableEntry() {
       day_of_week: entry.day_of_week,
       start_time: entry.start_time.substring(0, 5),
       end_time: entry.end_time.substring(0, 5),
-      room: entry.room || '',
     });
   };
 
@@ -216,7 +224,7 @@ export default function ManualTimetableEntry() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <div className="space-y-2">
               <Label>Class/Course *</Label>
               <Select value={classId} onValueChange={setClassId}>
@@ -226,7 +234,7 @@ export default function ManualTimetableEntry() {
                 <SelectContent>
                   {classes?.map(c => (
                     <SelectItem key={c.id} value={c.id}>
-                      {c.courses?.name} - {c.section}
+                      {c.courses?.code} - {c.courses?.name} ({c.section})
                     </SelectItem>
                   ))
                   }
@@ -271,15 +279,6 @@ export default function ManualTimetableEntry() {
                 </SelectContent>
               </Select>
             </div>
-
-            <div className="space-y-2">
-              <Label>Room</Label>
-              <Input 
-                placeholder="e.g., Room 101" 
-                value={room} 
-                onChange={(e) => setRoom(e.target.value)}
-              />
-            </div>
           </div>
 
           <div className="mt-4 flex justify-end">
@@ -317,10 +316,10 @@ export default function ManualTimetableEntry() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Course</TableHead>
+                    <TableHead>Code</TableHead>
                     <TableHead>Section</TableHead>
                     <TableHead>Day</TableHead>
                     <TableHead>Time</TableHead>
-                    <TableHead>Room</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -390,13 +389,6 @@ export default function ManualTimetableEntry() {
                               </SelectContent>
                             </Select>
                           </TableCell>
-                          <TableCell>
-                            <Input 
-                              value={editingEntry.room} 
-                              onChange={(e) => setEditingEntry({...editingEntry, room: e.target.value})}
-                              className="w-24"
-                            />
-                          </TableCell>
                           <TableCell className="text-right">
                             <div className="flex justify-end gap-1">
                               <Button 
@@ -424,6 +416,11 @@ export default function ManualTimetableEntry() {
                           </TableCell>
                           <TableCell>
                             <Badge variant="outline">
+                              {entry.classes?.courses?.code || '---'}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="secondary">
                               {entry.classes?.section || 'A'}
                             </Badge>
                           </TableCell>
@@ -431,7 +428,6 @@ export default function ManualTimetableEntry() {
                           <TableCell>
                             {entry.start_time.substring(0, 5)} - {entry.end_time.substring(0, 5)}
                           </TableCell>
-                          <TableCell>{entry.room || '-'}</TableCell>
                           <TableCell className="text-right">
                             <div className="flex justify-end gap-1">
                               <Button 
