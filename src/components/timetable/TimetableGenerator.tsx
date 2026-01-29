@@ -277,6 +277,7 @@ export default function TimetableGenerator() {
             <div className="flex flex-wrap gap-2 mt-2">
               <Badge variant="outline" className="text-xs">Max 3 theory/faculty/day</Badge>
               <Badge variant="outline" className="text-xs">≤2 continuous periods</Badge>
+              <Badge variant="outline" className="text-xs">Max 2 periods/subject/day</Badge>
               <Badge variant="outline" className="text-xs">Labs in afternoon</Badge>
               <Badge variant="outline" className="text-xs">Core subjects in morning</Badge>
               <Badge variant="outline" className="text-xs">Even workload distribution</Badge>
@@ -951,6 +952,7 @@ function JustificationView({ justification }: { justification: string[] }) {
           <ul className="text-sm space-y-1 text-muted-foreground">
             <li>• Maximum 3 theory periods per faculty per day</li>
             <li>• No more than 2 continuous theory periods</li>
+            <li>• Maximum 2 periods of same subject per day</li>
             <li>• At least 1 free period per faculty per day</li>
             <li>• Workload distributed evenly across the week</li>
             <li>• Labs scheduled in 2 consecutive periods (afternoon preferred)</li>
@@ -958,6 +960,7 @@ function JustificationView({ justification }: { justification: string[] }) {
             <li>• Core/heavy subjects scheduled in morning sessions</li>
             <li>• Seminar, soft skills on Friday/Saturday</li>
             <li>• Lunch break fixed at 12:45 PM - 1:25 PM</li>
+            <li>• Faculty clash prevention across all slots</li>
           </ul>
         </div>
       </CardContent>
