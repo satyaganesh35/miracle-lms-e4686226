@@ -25,7 +25,8 @@ import {
   BookOpen,
   Info,
   Pencil,
-  Plus
+  Plus,
+  FileDown
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -43,6 +44,7 @@ import {
 } from '@/lib/timetableScheduler';
 import EditSlotDialog from './EditSlotDialog';
 import AddSlotDialog from './AddSlotDialog';
+import { generateFacultyTimetablePdf, generateAllFacultyTimetablesPdf } from '@/lib/generateFacultyTimetablePdf';
 
 interface LocalSelectedClass {
   id: string;
@@ -871,6 +873,14 @@ function TimetableGrid({
 
 // Faculty Workload View Component
 function FacultyWorkloadView({ workloads }: { workloads: FacultyWorkload[] }) {
+  const handleExportSingle = (workload: FacultyWorkload) => {
+    generateFacultyTimetablePdf({ workload });
+  };
+
+  const handleExportAll = () => {
+    generateAllFacultyTimetablesPdf({ workloads });
+  };
+
   return (
     <div className="space-y-6">
       {workloads.length === 0 ? (
@@ -880,6 +890,14 @@ function FacultyWorkloadView({ workloads }: { workloads: FacultyWorkload[] }) {
         </div>
       ) : (
         <>
+          {/* Export All Button */}
+          <div className="flex justify-end">
+            <Button onClick={handleExportAll} variant="outline" className="gap-2">
+              <FileDown className="h-4 w-4" />
+              Export All Faculty PDFs
+            </Button>
+          </div>
+
           {/* Summary Table */}
           <div className="overflow-x-auto">
             <Table>
@@ -894,6 +912,7 @@ function FacultyWorkloadView({ workloads }: { workloads: FacultyWorkload[] }) {
                       {day.substring(0, 3)}
                     </TableHead>
                   ))}
+                  <TableHead className="font-bold text-center">Export</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -910,6 +929,16 @@ function FacultyWorkloadView({ workloads }: { workloads: FacultyWorkload[] }) {
                         {workload.periodsPerDay.get(day as DayOfWeek) || 0}
                       </TableCell>
                     ))}
+                    <TableCell className="text-center">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleExportSingle(workload)}
+                        title={`Export ${workload.teacherName}'s timetable`}
+                      >
+                        <FileDown className="h-4 w-4" />
+                      </Button>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -925,9 +954,20 @@ function FacultyWorkloadView({ workloads }: { workloads: FacultyWorkload[] }) {
                   <CardTitle className="text-base flex items-center gap-2">
                     <Users className="h-4 w-4 text-primary" />
                     {workload.teacherName}
-                    <Badge variant="outline" className="ml-auto">
-                      {workload.totalPeriods} periods/week
-                    </Badge>
+                    <div className="ml-auto flex items-center gap-2">
+                      <Badge variant="outline">
+                        {workload.totalPeriods} periods/week
+                      </Badge>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleExportSingle(workload)}
+                        className="gap-1"
+                      >
+                        <FileDown className="h-3 w-3" />
+                        PDF
+                      </Button>
+                    </div>
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
