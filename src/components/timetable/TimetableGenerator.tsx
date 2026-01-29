@@ -23,7 +23,9 @@ import {
   FlaskConical,
   Users,
   BookOpen,
-  Info
+  Info,
+  Pencil,
+  Plus
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -39,6 +41,8 @@ import {
   type FacultyWorkload,
   type DayOfWeek,
 } from '@/lib/timetableScheduler';
+import EditSlotDialog from './EditSlotDialog';
+import AddSlotDialog from './AddSlotDialog';
 
 interface LocalSelectedClass {
   id: string;
@@ -57,6 +61,11 @@ export default function TimetableGenerator() {
   const [justification, setJustification] = useState<string[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  
+  // Edit/Add slot state
+  const [editingSlot, setEditingSlot] = useState<GeneratedSlot | null>(null);
+  const [showAddDialog, setShowAddDialog] = useState(false);
+  const [addDialogDefaults, setAddDialogDefaults] = useState<{ day: DayOfWeek; slotIndex: number }>({ day: 'Monday', slotIndex: 0 });
 
   const handleClassToggle = (classId: string, isLab: boolean = false) => {
     setSelectedClasses(prev => {
@@ -202,6 +211,44 @@ export default function TimetableGenerator() {
   const removeSlot = (index: number) => {
     setGeneratedSchedule(prev => prev.filter((_, i) => i !== index));
   };
+
+  const updateSlot = (updatedSlot: GeneratedSlot) => {
+    setGeneratedSchedule(prev => {
+      // Find and replace the edited slot
+      return prev.map(slot => {
+        if (slot.class_id === editingSlot?.class_id && 
+            slot.day_of_week === editingSlot?.day_of_week && 
+            slot.start_time === editingSlot?.start_time) {
+          return updatedSlot;
+        }
+        return slot;
+      });
+    });
+    setEditingSlot(null);
+  };
+
+  const addSlot = (newSlot: GeneratedSlot) => {
+    setGeneratedSchedule(prev => [...prev, newSlot]);
+  };
+
+  const handleCellClick = (day: DayOfWeek, slotIndex: number, existingSlot?: GeneratedSlot) => {
+    if (existingSlot) {
+      setEditingSlot(existingSlot);
+    } else {
+      setAddDialogDefaults({ day, slotIndex });
+      setShowAddDialog(true);
+    }
+  };
+
+  // Get available classes for adding new slots
+  const availableClassesForAdd = classes?.map(c => ({
+    id: c.id,
+    courseName: c.courses?.name || 'Unknown Course',
+    courseCode: c.courses?.code || '---',
+    facultyName: c.profiles?.full_name || 'TBA',
+    teacherId: c.teacher_id,
+    section: c.section,
+  })) || [];
 
   const clearExistingTimetable = async () => {
     if (!confirm('Are you sure you want to clear all existing timetable entries? This cannot be undone.')) {
@@ -497,10 +544,14 @@ export default function TimetableGenerator() {
                   Generated Schedule Preview
                 </CardTitle>
                 <CardDescription>
-                  Review the faculty-optimized timetable ({generatedSchedule.length} entries)
+                  Review and edit the faculty-optimized timetable ({generatedSchedule.length} entries)
                 </CardDescription>
               </div>
               <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={() => setShowAddDialog(true)}>
+                  <Plus className="h-4 w-4 mr-1" />
+                  Add Slot
+                </Button>
                 <Button variant="outline" onClick={generateTimetable} disabled={isGenerating}>
                   <RefreshCw className="h-4 w-4 mr-1" />
                   Regenerate
@@ -548,6 +599,8 @@ export default function TimetableGenerator() {
                   previewGrid={previewGrid} 
                   removeSlot={removeSlot}
                   generatedSchedule={generatedSchedule}
+                  onCellClick={handleCellClick}
+                  onEditSlot={(slot) => setEditingSlot(slot)}
                 />
               </TabsContent>
 
@@ -569,6 +622,26 @@ export default function TimetableGenerator() {
           </CardContent>
         </Card>
       )}
+
+      {/* Edit Slot Dialog */}
+      <EditSlotDialog
+        open={!!editingSlot}
+        onOpenChange={(open) => !open && setEditingSlot(null)}
+        slot={editingSlot}
+        onSave={updateSlot}
+        occupiedSlots={previewGrid}
+      />
+
+      {/* Add Slot Dialog */}
+      <AddSlotDialog
+        open={showAddDialog}
+        onOpenChange={setShowAddDialog}
+        onAdd={addSlot}
+        occupiedSlots={previewGrid}
+        availableClasses={availableClassesForAdd}
+        defaultDay={addDialogDefaults.day}
+        defaultSlotIndex={addDialogDefaults.slotIndex}
+      />
 
       {/* Current Timetable Stats */}
       <Card className="shadow-card">
@@ -606,14 +679,24 @@ export default function TimetableGenerator() {
 function TimetableGrid({ 
   previewGrid, 
   removeSlot,
-  generatedSchedule 
+  generatedSchedule,
+  onCellClick,
+  onEditSlot,
 }: { 
   previewGrid: Map<string, GeneratedSlot>;
   removeSlot: (index: number) => void;
   generatedSchedule: GeneratedSlot[];
+  onCellClick: (day: DayOfWeek, slotIndex: number, existingSlot?: GeneratedSlot) => void;
+  onEditSlot: (slot: GeneratedSlot) => void;
 }) {
   return (
     <div className="space-y-6">
+      {/* Helper text */}
+      <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 p-3 rounded-lg">
+        <Pencil className="h-4 w-4" />
+        <span>Click on any cell to edit or add a slot. Click on empty cells to add new entries.</span>
+      </div>
+
       <div className="overflow-x-auto">
         <table className="w-full min-w-[900px] border-collapse">
           <thead>
@@ -669,15 +752,17 @@ function TimetableGrid({
                           <td 
                             key={slotIndex} 
                             colSpan={2}
-                            className="p-2 text-center border bg-purple-100 dark:bg-purple-900/30 min-w-[80px]"
+                            className="p-2 text-center border bg-purple-100 dark:bg-purple-900/30 min-w-[80px] cursor-pointer hover:bg-purple-200 dark:hover:bg-purple-800/40 transition-colors group"
+                            onClick={() => onCellClick(day, slotIndex, entry)}
                           >
-                            <div className="flex flex-col items-center gap-0.5">
+                            <div className="flex flex-col items-center gap-0.5 relative">
                               <span className="font-bold text-sm text-purple-800 dark:text-purple-200">
                                 {entry.courseCode}
                               </span>
                               <span className="text-[10px] text-purple-600 dark:text-purple-300">
                                 {entry.room}
                               </span>
+                              <Pencil className="h-3 w-3 absolute -top-1 -right-1 opacity-0 group-hover:opacity-100 transition-opacity text-purple-600" />
                             </div>
                           </td>
                         );
@@ -685,15 +770,17 @@ function TimetableGrid({
                         return (
                           <td 
                             key={slotIndex} 
-                            className="p-2 text-center border bg-blue-100 dark:bg-blue-900/30 min-w-[80px]"
+                            className="p-2 text-center border bg-blue-100 dark:bg-blue-900/30 min-w-[80px] cursor-pointer hover:bg-blue-200 dark:hover:bg-blue-800/40 transition-colors group"
+                            onClick={() => onCellClick(day, slotIndex, entry)}
                           >
-                            <div className="flex flex-col items-center gap-0.5">
+                            <div className="flex flex-col items-center gap-0.5 relative">
                               <span className="font-bold text-sm text-blue-800 dark:text-blue-200">
                                 {entry.courseCode}
                               </span>
                               <span className="text-[10px] text-blue-600 dark:text-blue-300">
                                 {entry.room}
                               </span>
+                              <Pencil className="h-3 w-3 absolute -top-1 -right-1 opacity-0 group-hover:opacity-100 transition-opacity text-blue-600" />
                             </div>
                           </td>
                         );
@@ -704,8 +791,11 @@ function TimetableGrid({
                     return (
                       <td 
                         key={slotIndex} 
-                        className="p-2 text-center border min-w-[80px]"
-                      />
+                        className="p-2 text-center border min-w-[80px] cursor-pointer hover:bg-primary/5 transition-colors group"
+                        onClick={() => onCellClick(day, slotIndex)}
+                      >
+                        <Plus className="h-4 w-4 mx-auto opacity-0 group-hover:opacity-50 transition-opacity text-muted-foreground" />
+                      </td>
                     );
                   })}
                 </tr>
@@ -728,7 +818,7 @@ function TimetableGrid({
                 <th className="text-left p-3 font-medium">Day</th>
                 <th className="text-left p-3 font-medium">Time</th>
                 <th className="text-left p-3 font-medium">Room</th>
-                <th className="text-right p-3 font-medium">Action</th>
+                <th className="text-right p-3 font-medium">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -751,14 +841,23 @@ function TimetableGrid({
                   </td>
                   <td className="p-3">{slot.room}</td>
                   <td className="p-3 text-right">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => removeSlot(index)}
-                      className="text-destructive hover:text-destructive"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    <div className="flex items-center justify-end gap-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => onEditSlot(slot)}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removeSlot(index)}
+                        className="text-destructive hover:text-destructive"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </td>
                 </tr>
               ))}
