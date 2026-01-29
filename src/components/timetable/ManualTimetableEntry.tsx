@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useClasses, useTimetable } from '@/hooks/useLMS';
+import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,15 +10,16 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 import { 
   Plus,
   Loader2, 
   Trash2,
-  Save,
   Edit2,
   X,
-  CheckCircle2
+  CheckCircle2,
+  Sparkles
 } from 'lucide-react';
 
 const DAYS = [
@@ -55,6 +57,7 @@ interface EditingEntry {
 }
 
 export default function ManualTimetableEntry() {
+  const { user } = useAuth();
   const { data: classes, isLoading: classesLoading } = useClasses();
   const { data: existingTimetable, isLoading: timetableLoading } = useTimetable();
   const queryClient = useQueryClient();
@@ -69,6 +72,7 @@ export default function ManualTimetableEntry() {
   const [useCustomSubject, setUseCustomSubject] = useState(false);
   const [customSubjectName, setCustomSubjectName] = useState('');
   const [customSubjectCode, setCustomSubjectCode] = useState('');
+  const [customSection, setCustomSection] = useState('A');
 
   const resetForm = () => {
     setClassId('');
@@ -78,6 +82,7 @@ export default function ManualTimetableEntry() {
     setUseCustomSubject(false);
     setCustomSubjectName('');
     setCustomSubjectCode('');
+    setCustomSection('A');
   };
 
   // Get time from selected period
@@ -93,14 +98,21 @@ export default function ManualTimetableEntry() {
   };
 
   const handleAddEntry = async () => {
-    if ((!classId && !useCustomSubject) || !dayOfWeek || !selectedPeriod) {
-      toast.error('Please fill all required fields');
+    if (!dayOfWeek || !selectedPeriod) {
+      toast.error('Please select day and period');
       return;
     }
-    
-    if (useCustomSubject && (!customSubjectName || !customSubjectCode)) {
-      toast.error('Please enter subject name and code');
-      return;
+
+    if (useCustomSubject) {
+      if (!customSubjectName.trim() || !customSubjectCode.trim()) {
+        toast.error('Please enter subject name and code');
+        return;
+      }
+    } else {
+      if (!classId) {
+        toast.error('Please select a class');
+        return;
+      }
     }
 
     const times = getTimesFromPeriod(selectedPeriod);
@@ -112,10 +124,49 @@ export default function ManualTimetableEntry() {
     setIsSaving(true);
 
     try {
+      let finalClassId = classId;
+
+      // If using custom subject, create the course and class first
+      if (useCustomSubject) {
+        // Step 1: Create the course
+        const { data: newCourse, error: courseError } = await supabase
+          .from('courses')
+          .insert({
+            name: customSubjectName.trim(),
+            code: customSubjectCode.trim().toUpperCase(),
+            semester: 1,
+            credits: 3,
+          })
+          .select()
+          .single();
+
+        if (courseError) throw courseError;
+
+        // Step 2: Create a class for this course
+        const { data: newClass, error: classError } = await supabase
+          .from('classes')
+          .insert({
+            course_id: newCourse.id,
+            teacher_id: user?.id,
+            section: customSection,
+            academic_year: '2025-26',
+          })
+          .select()
+          .single();
+
+        if (classError) throw classError;
+
+        finalClassId = newClass.id;
+
+        // Invalidate classes query to refresh the dropdown
+        queryClient.invalidateQueries({ queryKey: ['classes'] });
+      }
+
+      // Step 3: Add timetable entry
       const { error } = await supabase
         .from('timetable')
         .insert({
-          class_id: classId,
+          class_id: finalClassId,
           day_of_week: dayOfWeek,
           start_time: times.start,
           end_time: times.end,
@@ -124,7 +175,10 @@ export default function ManualTimetableEntry() {
 
       if (error) throw error;
 
-      toast.success('Timetable entry added successfully');
+      toast.success(useCustomSubject 
+        ? 'Subject created and added to timetable!' 
+        : 'Timetable entry added successfully'
+      );
       resetForm();
       queryClient.invalidateQueries({ queryKey: ['timetable'] });
     } catch (error: any) {
@@ -224,23 +278,78 @@ export default function ManualTimetableEntry() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            <div className="space-y-2">
-              <Label>Class/Course *</Label>
-              <Select value={classId} onValueChange={setClassId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select class" />
-                </SelectTrigger>
-                <SelectContent>
-                  {classes?.map(c => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {c.courses?.code} - {c.courses?.name} ({c.section})
-                    </SelectItem>
-                  ))
-                  }
-                </SelectContent>
-              </Select>
+          {/* Toggle for Custom Subject */}
+          <div className="flex items-center justify-between p-4 rounded-lg border bg-muted/30 mb-4">
+            <div className="space-y-0.5">
+              <Label className="flex items-center gap-2 font-medium">
+                <Sparkles className="h-4 w-4 text-primary" />
+                Create New Subject
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                Add a custom subject without going to Courses Management
+              </p>
             </div>
+            <Switch 
+              checked={useCustomSubject} 
+              onCheckedChange={(checked) => {
+                setUseCustomSubject(checked);
+                if (checked) setClassId('');
+              }}
+            />
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {useCustomSubject ? (
+              <>
+                <div className="space-y-2">
+                  <Label>Subject Name *</Label>
+                  <Input
+                    value={customSubjectName}
+                    onChange={(e) => setCustomSubjectName(e.target.value)}
+                    placeholder="e.g., Data Structures"
+                    maxLength={100}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Subject Code *</Label>
+                  <Input
+                    value={customSubjectCode}
+                    onChange={(e) => setCustomSubjectCode(e.target.value.toUpperCase())}
+                    placeholder="e.g., CS201"
+                    maxLength={20}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Section</Label>
+                  <Select value={customSection} onValueChange={setCustomSection}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select section" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="A">Section A</SelectItem>
+                      <SelectItem value="B">Section B</SelectItem>
+                      <SelectItem value="C">Section C</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </>
+            ) : (
+              <div className="space-y-2">
+                <Label>Class/Course *</Label>
+                <Select value={classId} onValueChange={setClassId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select class" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {classes?.map(c => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.courses?.code} - {c.courses?.name} ({c.section})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label>Day *</Label>
@@ -251,8 +360,7 @@ export default function ManualTimetableEntry() {
                 <SelectContent>
                   {DAYS.map(d => (
                     <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>
-                  ))
-                  }
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -286,12 +394,12 @@ export default function ManualTimetableEntry() {
               {isSaving ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Adding...
+                  {useCustomSubject ? 'Creating...' : 'Adding...'}
                 </>
               ) : (
                 <>
                   <Plus className="h-4 w-4 mr-2" />
-                  Add Entry
+                  {useCustomSubject ? 'Create & Add' : 'Add Entry'}
                 </>
               )}
             </Button>
