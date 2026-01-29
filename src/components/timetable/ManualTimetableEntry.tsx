@@ -29,16 +29,21 @@ const DAYS = [
   { value: 'Saturday', label: 'Saturday' },
 ];
 
-const TIME_OPTIONS = [
-  '09:00', '09:15', '09:30', '09:45',
-  '10:00', '10:05', '10:15', '10:30', '10:45', '10:55',
-  '11:00', '11:05', '11:15', '11:30', '11:45', '11:55',
-  '12:00', '12:15', '12:30', '12:45',
-  '13:00', '13:25', '13:30', '13:45',
-  '14:00', '14:15', '14:30', '14:45',
-  '15:00', '15:05', '15:15', '15:30', '15:45', '15:55',
-  '16:00', '16:15', '16:30', '16:45',
-  '17:00',
+// Fixed college time periods
+const PERIODS = [
+  { value: '1', label: '1st Period', start: '09:15', end: '10:05' },
+  { value: '2', label: '2nd Period', start: '10:05', end: '10:55' },
+  { value: '3', label: '3rd Period', start: '11:05', end: '11:55' },
+  { value: '4', label: '4th Period', start: '11:55', end: '12:45' },
+  { value: '5', label: '5th Period', start: '13:25', end: '14:15' },
+  { value: '6', label: '6th Period', start: '14:15', end: '15:05' },
+  { value: '7', label: '7th Period', start: '15:05', end: '15:55' },
+  // Lab periods (2 consecutive periods)
+  { value: 'lab-12', label: 'Lab (1st & 2nd Period)', start: '09:15', end: '10:55', isLab: true },
+  { value: 'lab-23', label: 'Lab (2nd & 3rd Period)', start: '10:05', end: '11:55', isLab: true },
+  { value: 'lab-34', label: 'Lab (3rd & 4th Period)', start: '11:05', end: '12:45', isLab: true },
+  { value: 'lab-56', label: 'Lab (5th & 6th Period)', start: '13:25', end: '15:05', isLab: true },
+  { value: 'lab-67', label: 'Lab (6th & 7th Period)', start: '14:15', end: '15:55', isLab: true },
 ];
 
 interface EditingEntry {
@@ -57,8 +62,7 @@ export default function ManualTimetableEntry() {
 
   const [classId, setClassId] = useState('');
   const [dayOfWeek, setDayOfWeek] = useState('');
-  const [startTime, setStartTime] = useState('');
-  const [endTime, setEndTime] = useState('');
+  const [selectedPeriod, setSelectedPeriod] = useState('');
   const [room, setRoom] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [editingEntry, setEditingEntry] = useState<EditingEntry | null>(null);
@@ -66,20 +70,32 @@ export default function ManualTimetableEntry() {
   const resetForm = () => {
     setClassId('');
     setDayOfWeek('');
-    setStartTime('');
-    setEndTime('');
+    setSelectedPeriod('');
     setRoom('');
     setEditingEntry(null);
   };
 
+  // Get time from selected period
+  const getTimesFromPeriod = (periodValue: string) => {
+    const period = PERIODS.find(p => p.value === periodValue);
+    return period ? { start: period.start, end: period.end } : null;
+  };
+
+  // Find period by start and end time
+  const findPeriodByTime = (start: string, end: string) => {
+    const period = PERIODS.find(p => p.start === start && p.end === end);
+    return period?.value || '';
+  };
+
   const handleAddEntry = async () => {
-    if (!classId || !dayOfWeek || !startTime || !endTime) {
+    if (!classId || !dayOfWeek || !selectedPeriod) {
       toast.error('Please fill all required fields');
       return;
     }
 
-    if (startTime >= endTime) {
-      toast.error('End time must be after start time');
+    const times = getTimesFromPeriod(selectedPeriod);
+    if (!times) {
+      toast.error('Invalid period selected');
       return;
     }
 
@@ -91,8 +107,8 @@ export default function ManualTimetableEntry() {
         .insert({
           class_id: classId,
           day_of_week: dayOfWeek,
-          start_time: startTime,
-          end_time: endTime,
+          start_time: times.start,
+          end_time: times.end,
           room: room || null,
         });
 
@@ -200,7 +216,7 @@ export default function ManualTimetableEntry() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <div className="space-y-2">
               <Label>Class/Course *</Label>
               <Select value={classId} onValueChange={setClassId}>
@@ -234,31 +250,24 @@ export default function ManualTimetableEntry() {
             </div>
 
             <div className="space-y-2">
-              <Label>Start Time *</Label>
-              <Select value={startTime} onValueChange={setStartTime}>
+              <Label>Period *</Label>
+              <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Start time" />
+                  <SelectValue placeholder="Select period" />
                 </SelectTrigger>
                 <SelectContent>
-                  {TIME_OPTIONS.map(t => (
-                    <SelectItem key={t} value={t}>{t}</SelectItem>
-                  ))
-                  }
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label>End Time *</Label>
-              <Select value={endTime} onValueChange={setEndTime}>
-                <SelectTrigger>
-                  <SelectValue placeholder="End time" />
-                </SelectTrigger>
-                <SelectContent>
-                  {TIME_OPTIONS.map(t => (
-                    <SelectItem key={t} value={t}>{t}</SelectItem>
-                  ))
-                  }
+                  <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">Theory Periods</div>
+                  {PERIODS.filter(p => !p.isLab).map(p => (
+                    <SelectItem key={p.value} value={p.value}>
+                      {p.label} ({p.start} - {p.end})
+                    </SelectItem>
+                  ))}
+                  <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground border-t mt-1 pt-1">Lab Sessions (2 periods)</div>
+                  {PERIODS.filter(p => p.isLab).map(p => (
+                    <SelectItem key={p.value} value={p.value}>
+                      {p.label} ({p.start} - {p.end})
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -355,37 +364,31 @@ export default function ManualTimetableEntry() {
                             </Select>
                           </TableCell>
                           <TableCell>
-                            <div className="flex gap-1">
-                              <Select 
-                                value={editingEntry.start_time} 
-                                onValueChange={(v) => setEditingEntry({...editingEntry, start_time: v})}
-                              >
-                                <SelectTrigger className="w-20">
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {TIME_OPTIONS.map(t => (
-                                    <SelectItem key={t} value={t}>{t}</SelectItem>
-                                  ))
-                                  }
-                                </SelectContent>
-                              </Select>
-                              <span className="self-center">-</span>
-                              <Select 
-                                value={editingEntry.end_time} 
-                                onValueChange={(v) => setEditingEntry({...editingEntry, end_time: v})}
-                              >
-                                <SelectTrigger className="w-20">
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {TIME_OPTIONS.map(t => (
-                                    <SelectItem key={t} value={t}>{t}</SelectItem>
-                                  ))
-                                  }
-                                </SelectContent>
-                              </Select>
-                            </div>
+                            <Select 
+                              value={findPeriodByTime(editingEntry.start_time, editingEntry.end_time)} 
+                              onValueChange={(v) => {
+                                const period = PERIODS.find(p => p.value === v);
+                                if (period) {
+                                  setEditingEntry({...editingEntry, start_time: period.start, end_time: period.end});
+                                }
+                              }}
+                            >
+                              <SelectTrigger className="w-full min-w-[180px]">
+                                <SelectValue placeholder="Select period" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {PERIODS.filter(p => !p.isLab).map(p => (
+                                  <SelectItem key={p.value} value={p.value}>
+                                    {p.label}
+                                  </SelectItem>
+                                ))}
+                                {PERIODS.filter(p => p.isLab).map(p => (
+                                  <SelectItem key={p.value} value={p.value}>
+                                    {p.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
                           </TableCell>
                           <TableCell>
                             <Input 
