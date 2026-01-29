@@ -5,8 +5,8 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
-import { Clock, MapPin, Calendar, BookOpen } from 'lucide-react';
-import { DAYS, TIME_SLOTS, ROOMS, LABS, type DayOfWeek, type GeneratedSlot } from '@/lib/timetableScheduler';
+import { Clock, Calendar, BookOpen } from 'lucide-react';
+import { DAYS, TIME_SLOTS, type DayOfWeek, type GeneratedSlot } from '@/lib/timetableScheduler';
 
 interface ClassOption {
   id: string;
@@ -40,9 +40,7 @@ export default function AddSlotDialog({
   const [isLab, setIsLab] = useState(false);
   const [selectedDay, setSelectedDay] = useState<DayOfWeek>(defaultDay);
   const [selectedStartSlot, setSelectedStartSlot] = useState<number>(defaultSlotIndex);
-  const [selectedRoom, setSelectedRoom] = useState<string>(ROOMS[0]);
 
-  const roomOptions = isLab ? LABS : ROOMS;
   const selectedClass = availableClasses.find(c => c.id === selectedClassId);
 
   // Get available time slots (exclude lunch and check conflicts)
@@ -97,7 +95,7 @@ export default function AddSlotDialog({
       day_of_week: selectedDay,
       start_time: startTimeSlot.start,
       end_time: endTimeSlot.end,
-      room: selectedRoom,
+      room: '',
       courseName: isLab ? `${selectedClass.courseName} LAB` : selectedClass.courseName,
       courseCode: isLab ? `${selectedClass.courseCode}-LAB` : selectedClass.courseCode,
       section: selectedClass.section,
@@ -112,7 +110,6 @@ export default function AddSlotDialog({
     // Reset form
     setSelectedClassId('');
     setIsLab(false);
-    setSelectedRoom(ROOMS[0]);
   };
 
   const handleOpenChange = (open: boolean) => {
@@ -172,10 +169,7 @@ export default function AddSlotDialog({
             </div>
             <Switch 
               checked={isLab} 
-              onCheckedChange={(checked) => {
-                setIsLab(checked);
-                setSelectedRoom(checked ? LABS[0] : ROOMS[0]);
-              }}
+              onCheckedChange={setIsLab}
             />
           </div>
 
@@ -226,24 +220,6 @@ export default function AddSlotDialog({
             {availableTimeSlots.length === 0 && (
               <p className="text-xs text-destructive">No available slots for this day</p>
             )}
-          </div>
-
-          {/* Room Selection */}
-          <div className="space-y-2">
-            <Label className="flex items-center gap-2">
-              <MapPin className="h-4 w-4" />
-              {isLab ? 'Lab' : 'Room'}
-            </Label>
-            <Select value={selectedRoom} onValueChange={setSelectedRoom}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {roomOptions.map(room => (
-                  <SelectItem key={room} value={room}>{room}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
           </div>
         </div>
 

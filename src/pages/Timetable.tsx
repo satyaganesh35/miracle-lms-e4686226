@@ -264,9 +264,6 @@ function TimetableView({
                             {schedule && (
                               <div className="flex flex-col items-center gap-0.5">
                                 <span className="font-bold text-sm">{abbrev}</span>
-                                {schedule.room && (
-                                  <span className="text-[10px] opacity-70">{schedule.room}</span>
-                                )}
                               </div>
                             )}
                           </td>
