@@ -72,6 +72,7 @@ const navItems: NavItem[] = [
   { label: 'Events', icon: <PartyPopper className="h-5 w-5" />, href: '/events', roles: ['admin', 'teacher', 'student'] },
   { label: 'Notifications', icon: <Bell className="h-5 w-5" />, href: '/notifications', roles: ['admin', 'teacher', 'student'] },
   { label: 'Fee Management', icon: <CreditCard className="h-5 w-5" />, href: '/fees', roles: ['admin', 'student'] },
+  { label: 'Courses & Classes', icon: <BookOpen className="h-5 w-5" />, href: '/courses', roles: ['admin'] },
   { label: 'Manage Users', icon: <Users className="h-5 w-5" />, href: '/users', roles: ['admin'] },
   { label: 'Upload Content', icon: <Upload className="h-5 w-5" />, href: '/upload', roles: ['admin', 'teacher'] },
   { label: 'Query Bot', icon: <MessageSquare className="h-5 w-5" />, href: '/query-bot', roles: ['admin', 'teacher', 'student'] },

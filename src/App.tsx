@@ -31,6 +31,7 @@ import FacultyFeedback from "./pages/FacultyFeedback";
 import Library from "./pages/Library";
 import LostAndFound from "./pages/LostAndFound";
 import Events from "./pages/Events";
+import CoursesManagement from "./pages/CoursesManagement";
 
 const queryClient = new QueryClient();
 
@@ -80,6 +81,7 @@ const AppRoutes = () => (
     <Route path="/library" element={<ProtectedRoute><Library /></ProtectedRoute>} />
     <Route path="/lost-and-found" element={<ProtectedRoute><LostAndFound /></ProtectedRoute>} />
     <Route path="/events" element={<ProtectedRoute><Events /></ProtectedRoute>} />
+    <Route path="/courses" element={<ProtectedRoute><CoursesManagement /></ProtectedRoute>} />
     <Route path="*" element={<NotFound />} />
   </Routes>
 );
