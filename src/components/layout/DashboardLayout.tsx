@@ -54,7 +54,7 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { label: 'Dashboard', icon: <LayoutDashboard className="h-5 w-5" />, href: '/dashboard', roles: ['admin', 'teacher', 'student'] },
-  { label: 'Timetable', icon: <Calendar className="h-5 w-5" />, href: '/timetable', roles: ['teacher', 'student'] },
+  { label: 'Timetable', icon: <Calendar className="h-5 w-5" />, href: '/timetable', roles: ['admin', 'teacher', 'student'] },
   { label: 'Syllabus', icon: <BookOpen className="h-5 w-5" />, href: '/syllabus', roles: ['teacher', 'student'] },
   { label: 'Assignments', icon: <ClipboardList className="h-5 w-5" />, href: '/assignments', roles: ['teacher', 'student'] },
   { label: 'Notes & Materials', icon: <FileText className="h-5 w-5" />, href: '/notes', roles: ['teacher', 'student'] },
