@@ -9,11 +9,13 @@ import { Progress } from '@/components/ui/progress';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { 
-  CheckSquare, Calendar, TrendingUp, AlertCircle, 
-  Check, X, Clock, Users, Save, Loader2
+  CheckSquare, TrendingUp, TrendingDown, AlertCircle, 
+  Check, X, Clock, Users, Save, Loader2, Download
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { format } from 'date-fns';
+import AttendanceCalendar from '@/components/attendance/AttendanceCalendar';
 
 const DEPARTMENTS = [
   { value: 'CSE', label: 'CSE' },
@@ -58,6 +60,15 @@ export default function Attendance() {
     });
   }, [profiles, selectedDepartment, selectedSemester]);
 
+  // Calculate detailed stats for calendar - moved before early returns
+  const calendarRecords = useMemo(() => {
+    if (!attendanceRecords) return [];
+    return attendanceRecords.map(r => ({
+      date: r.date,
+      status: r.status
+    }));
+  }, [attendanceRecords]);
+
   // Calculate attendance stats for student view
   const attendanceStats = useMemo(() => {
     if (!attendanceRecords) return { overall: 0, thisMonth: 0, subjects: [], recentClasses: [] };
@@ -100,6 +111,15 @@ export default function Attendance() {
 
     return { overall, thisMonth: thisMonthPercentage, subjects, recentClasses };
   }, [attendanceRecords]);
+
+  const presentCount = attendanceRecords?.filter(r => r.status === 'present').length || 0;
+  const absentCount = attendanceRecords?.filter(r => r.status === 'absent').length || 0;
+  const lateCount = attendanceRecords?.filter(r => r.status === 'late').length || 0;
+  const totalRecords = attendanceRecords?.length || 0;
+
+  const presentPercentage = totalRecords > 0 ? Math.round((presentCount / totalRecords) * 100) : 0;
+  const absentPercentage = totalRecords > 0 ? Math.round((absentCount / totalRecords) * 100) : 0;
+  const latePercentage = totalRecords > 0 ? Math.round((lateCount / totalRecords) * 100) : 0;
 
   const toggleAttendance = (studentId: string) => {
     setAttendanceState(prev => ({ ...prev, [studentId]: !prev[studentId] }));
@@ -296,70 +316,115 @@ export default function Attendance() {
     );
   }
 
+
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
         {/* Header */}
-        <div>
-          <h1 className="text-2xl font-display font-bold">Attendance</h1>
-          <p className="text-muted-foreground">Track your class attendance</p>
+        <Card className="shadow-card bg-gradient-to-r from-primary/10 to-primary/5 border-primary/20">
+          <CardContent className="p-6">
+            <div className="flex items-start justify-between">
+              <div className="flex items-center gap-4">
+                <div className="p-3 rounded-xl bg-primary/10">
+                  <CheckSquare className="h-8 w-8 text-primary" />
+                </div>
+                <div>
+                  <h1 className="text-2xl font-display font-bold">Attendance</h1>
+                  <p className="text-muted-foreground">Track your attendance and maintain your academic record</p>
+                </div>
+              </div>
+              <Button variant="outline" size="sm" className="gap-2">
+                <Download className="h-4 w-4" />
+                Export Report
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Overall Attendance Card */}
+        <Card className="shadow-card bg-gradient-to-br from-primary/5 to-background border-primary/20">
+          <CardContent className="p-6">
+            <p className="text-sm text-muted-foreground mb-1">Overall Attendance</p>
+            <p className="text-4xl font-display font-bold text-primary">{attendanceStats.overall}%</p>
+            <div className="flex items-center gap-2 mt-2">
+              {attendanceStats.overall < 75 ? (
+                <>
+                  <TrendingDown className="h-4 w-4 text-destructive" />
+                  <span className="text-sm text-destructive font-medium">Below 75%</span>
+                </>
+              ) : (
+                <>
+                  <TrendingUp className="h-4 w-4 text-success" />
+                  <span className="text-sm text-success font-medium">Good Standing</span>
+                </>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Stats Cards - Present, Absent, Late */}
+        <div className="grid gap-4 grid-cols-1 sm:grid-cols-3">
+          <Card className="shadow-card bg-success/5 border-success/20">
+            <CardContent className="p-4">
+              <p className="text-3xl font-display font-bold text-success">{presentCount}</p>
+              <p className="text-sm text-muted-foreground mt-1">{presentPercentage}% of total</p>
+            </CardContent>
+          </Card>
+          <Card className="shadow-card bg-destructive/5 border-destructive/20">
+            <CardContent className="p-4">
+              <p className="text-sm text-muted-foreground mb-1">Absent</p>
+              <p className="text-3xl font-display font-bold text-destructive">{absentCount}</p>
+              <p className="text-sm text-muted-foreground mt-1">{absentPercentage}% of total</p>
+            </CardContent>
+          </Card>
+          <Card className="shadow-card bg-warning/5 border-warning/20">
+            <CardContent className="p-4">
+              <p className="text-sm text-muted-foreground mb-1">Late</p>
+              <p className="text-3xl font-display font-bold text-warning">{lateCount}</p>
+              <p className="text-sm text-muted-foreground mt-1">{latePercentage}% of total</p>
+            </CardContent>
+          </Card>
         </div>
 
-        {/* Overall Stats */}
-        <div className="grid gap-4 md:grid-cols-3">
-          <Card className="shadow-card bg-primary/5 border-primary/20">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">Overall Attendance</p>
-                  <p className="text-3xl font-display font-bold">{attendanceStats.overall}%</p>
-                </div>
-                <div className="p-3 rounded-xl bg-primary/10">
-                  <CheckSquare className="h-6 w-6 text-primary" />
-                </div>
+        {/* Attendance Calendar */}
+        <AttendanceCalendar attendanceRecords={calendarRecords} />
+
+        {/* Recent Attendance Records */}
+        <Card className="shadow-card">
+          <CardHeader>
+            <CardTitle className="font-display">Recent Attendance</CardTitle>
+            <CardDescription>Your latest attendance records</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {attendanceStats.recentClasses.length > 0 ? (
+              <div className="space-y-3">
+                {attendanceStats.recentClasses.map((cls, index) => (
+                  <div key={index} className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+                    <div className="flex items-center gap-3">
+                      {getStatusIcon(cls.status)}
+                      <div>
+                        <p className="font-medium">{cls.subject}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {format(new Date(cls.date), 'MMM dd, yyyy')}
+                        </p>
+                      </div>
+                    </div>
+                    {getStatusBadge(cls.status)}
+                  </div>
+                ))}
               </div>
-              <Progress value={attendanceStats.overall} className="h-2 mt-4" />
-            </CardContent>
-          </Card>
-          <Card className="shadow-card bg-success/5 border-success/20">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">This Month</p>
-                  <p className="text-3xl font-display font-bold text-success">{attendanceStats.thisMonth}%</p>
-                </div>
-                <div className="p-3 rounded-xl bg-success/10">
-                  <TrendingUp className="h-6 w-6 text-success" />
-                </div>
+            ) : (
+              <div className="text-center py-12">
+                <CheckSquare className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                <p className="text-lg font-medium">No Attendance Records</p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Your attendance records will appear here once classes begin.
+                </p>
               </div>
-            </CardContent>
-          </Card>
-          <Card className="shadow-card">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">Status</p>
-                  <p className={cn(
-                    "text-xl font-display font-bold",
-                    attendanceStats.overall >= 75 ? "text-success" : "text-destructive"
-                  )}>
-                    {attendanceStats.overall >= 75 ? 'Good Standing' : 'Low Attendance'}
-                  </p>
-                </div>
-                <div className={cn(
-                  "p-3 rounded-xl",
-                  attendanceStats.overall >= 75 ? "bg-success/10" : "bg-destructive/10"
-                )}>
-                  {attendanceStats.overall >= 75 ? (
-                    <Check className="h-6 w-6 text-success" />
-                  ) : (
-                    <AlertCircle className="h-6 w-6 text-destructive" />
-                  )}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+            )}
+          </CardContent>
+        </Card>
 
         {/* Subject-wise Attendance */}
         <Card className="shadow-card">
