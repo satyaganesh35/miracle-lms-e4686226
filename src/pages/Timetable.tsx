@@ -2,12 +2,15 @@ import { useAuth } from '@/hooks/useAuth';
 import { useTimetable } from '@/hooks/useLMS';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import TimetableGenerator from '@/components/timetable/TimetableGenerator';
+import ManualTimetableEntry from '@/components/timetable/ManualTimetableEntry';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Calendar, Clock, Wand2, Loader2, TableIcon, Phone, User, GraduationCap } from 'lucide-react';
+import { Calendar, Clock, Wand2, Loader2, TableIcon, Phone, User, GraduationCap, FileDown, PenLine } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { generateTimetablePdf } from '@/lib/generateTimetablePdf';
 
 const DAYS = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
 
@@ -100,14 +103,18 @@ export default function Timetable() {
 
         {isTeacherOrAdmin ? (
           <Tabs defaultValue="view" className="space-y-6">
-            <TabsList className="grid w-full max-w-md grid-cols-2">
+            <TabsList className="grid w-full max-w-lg grid-cols-3">
               <TabsTrigger value="view" className="flex items-center gap-2">
                 <TableIcon className="h-4 w-4" />
                 View Schedule
               </TabsTrigger>
+              <TabsTrigger value="manual" className="flex items-center gap-2">
+                <PenLine className="h-4 w-4" />
+                Manual Entry
+              </TabsTrigger>
               <TabsTrigger value="generate" className="flex items-center gap-2">
                 <Wand2 className="h-4 w-4" />
-                Generate Timetable
+                Auto Generate
               </TabsTrigger>
             </TabsList>
 
@@ -118,6 +125,10 @@ export default function Timetable() {
                 getSubjectColor={getSubjectColor}
                 subjectFacultyMap={subjectFacultyMap}
               />
+            </TabsContent>
+
+            <TabsContent value="manual">
+              <ManualTimetableEntry />
             </TabsContent>
 
             <TabsContent value="generate">
@@ -150,6 +161,16 @@ function TimetableView({
   getSubjectColor, 
   subjectFacultyMap 
 }: TimetableViewProps) {
+  const handleExportPdf = () => {
+    if (!timetableData) return;
+    generateTimetablePdf({
+      timetableData,
+      departmentName: 'DEPARTMENT OF COMPUTER SCIENCE & ENGINEERING',
+      academicYear: '2025-2026',
+      semester: 'III YEAR II SEMESTER',
+    });
+  };
+
   return (
     <>
       {/* College Header */}
@@ -165,6 +186,12 @@ function TimetableView({
                 III YEAR II SEMESTER TIME TABLE | A.Y: 2025-2026
               </p>
             </div>
+          </div>
+          <div className="flex justify-center mt-3">
+            <Button onClick={handleExportPdf} variant="outline" className="gap-2">
+              <FileDown className="h-4 w-4" />
+              Export as PDF
+            </Button>
           </div>
         </CardHeader>
       </Card>
