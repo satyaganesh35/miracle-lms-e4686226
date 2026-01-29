@@ -55,6 +55,12 @@ const SEMESTERS = [
   { value: '4-2', label: '8th Semester' },
 ];
 
+const SECTIONS = [
+  { value: 'A', label: 'Section A' },
+  { value: 'B', label: 'Section B' },
+  { value: 'C', label: 'Section C' },
+];
+
 const subjectColors: Record<string, string> = {
   'Data Structures & Algorithms': 'bg-blue-100 text-blue-800 border-blue-300',
   'Database Management Systems': 'bg-purple-100 text-purple-800 border-purple-300',
@@ -95,6 +101,7 @@ export default function Timetable() {
   const [selectedDepartment, setSelectedDepartment] = useState('CSE');
   const [selectedYear, setSelectedYear] = useState('III');
   const [selectedSemester, setSelectedSemester] = useState('3-2');
+  const [selectedSection, setSelectedSection] = useState('A');
   
   const { data: timetableData, isLoading } = useTimetable(user?.id);
 
@@ -167,7 +174,7 @@ export default function Timetable() {
             </TabsList>
 
             <TabsContent value="view" className="space-y-6">
-              <TimetableView 
+            <TimetableView 
                 timetableData={timetableData}
                 getScheduleForSlot={getScheduleForSlot}
                 getSubjectColor={getSubjectColor}
@@ -178,6 +185,8 @@ export default function Timetable() {
                 setSelectedYear={setSelectedYear}
                 selectedSemester={selectedSemester}
                 setSelectedSemester={setSelectedSemester}
+                selectedSection={selectedSection}
+                setSelectedSection={setSelectedSection}
                 isAdmin={true}
               />
             </TabsContent>
@@ -202,6 +211,8 @@ export default function Timetable() {
             setSelectedYear={setSelectedYear}
             selectedSemester={selectedSemester}
             setSelectedSemester={setSelectedSemester}
+            selectedSection={selectedSection}
+            setSelectedSection={setSelectedSection}
             isAdmin={false}
           />
         )}
@@ -221,6 +232,8 @@ interface TimetableViewProps {
   setSelectedYear: (value: string) => void;
   selectedSemester: string;
   setSelectedSemester: (value: string) => void;
+  selectedSection: string;
+  setSelectedSection: (value: string) => void;
   isAdmin: boolean;
 }
 
@@ -235,6 +248,8 @@ function TimetableView({
   setSelectedYear,
   selectedSemester,
   setSelectedSemester,
+  selectedSection,
+  setSelectedSection,
   isAdmin,
 }: TimetableViewProps) {
   const handleExportPdf = () => {
@@ -253,7 +268,7 @@ function TimetableView({
       {isAdmin && (
         <Card className="shadow-card">
           <CardContent className="pt-6">
-            <div className="grid gap-4 sm:grid-cols-3">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <div className="space-y-2">
                 <Label className="flex items-center gap-2">
                   <Building2 className="h-4 w-4" />
@@ -310,6 +325,25 @@ function TimetableView({
                   </SelectContent>
                 </Select>
               </div>
+
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <User className="h-4 w-4" />
+                  Section
+                </Label>
+                <Select value={selectedSection} onValueChange={setSelectedSection}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select section" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SECTIONS.map(sec => (
+                      <SelectItem key={sec.value} value={sec.value}>
+                        {sec.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -325,7 +359,7 @@ function TimetableView({
                 {getDepartmentFullName(selectedDepartment)}
               </CardTitle>
               <p className="text-sm text-muted-foreground">
-                {getSemesterDisplay(selectedYear, selectedSemester)} TIME TABLE | A.Y: 2025-2026
+                {getSemesterDisplay(selectedYear, selectedSemester)} | Section {selectedSection} | A.Y: 2025-2026
               </p>
             </div>
           </div>
