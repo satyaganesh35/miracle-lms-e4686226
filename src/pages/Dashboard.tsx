@@ -257,7 +257,7 @@ function TeacherDashboard() {
             { label: 'Upload Notes', icon: Upload, href: '/upload', variant: 'default' },
             { label: 'Assignments', icon: ClipboardList, href: '/assignments', variant: 'default' },
             { label: 'Grade Work', icon: BarChart3, href: '/grades', variant: 'default' },
-            { label: 'View Timetable', icon: Calendar, href: '/timetable', variant: 'default' },
+            { label: 'Timetable Generator', icon: Calendar, href: '/timetable', variant: 'default' },
             { label: 'AI Assistant', icon: GraduationCap, href: '/query-bot', variant: 'accent' },
           ]}
         />
@@ -468,9 +468,30 @@ function AdminDashboard() {
         </Card>
       </div>
 
-      {/* Database Seeder */}
+      {/* Database Seeder & Timetable Generator */}
       <div className="grid gap-6 lg:grid-cols-2">
         <DatabaseSeeder />
+        <Card className="shadow-lg border-0 bg-gradient-to-br from-info/5 to-info/10">
+          <CardHeader className="pb-3">
+            <CardTitle className="font-display text-lg flex items-center gap-2">
+              <div className="p-2 rounded-lg bg-info/10">
+                <Calendar className="h-5 w-5 text-info" />
+              </div>
+              Timetable Management
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground mb-4">
+              Generate and manage class timetables automatically for all courses.
+            </p>
+            <Button asChild>
+              <Link to="/timetable">
+                <Calendar className="h-4 w-4 mr-2" />
+                Open Timetable Generator
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
