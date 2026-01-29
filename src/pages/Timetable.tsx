@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useTimetable } from '@/hooks/useLMS';
 import DashboardLayout from '@/components/layout/DashboardLayout';
@@ -8,7 +9,9 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Calendar, Clock, Wand2, Loader2, TableIcon, Phone, User, GraduationCap, FileDown, PenLine } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
+import { Calendar, Clock, Wand2, Loader2, TableIcon, Phone, User, GraduationCap, FileDown, PenLine, Building2, BookOpen } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { generateTimetablePdf } from '@/lib/generateTimetablePdf';
 
@@ -23,6 +26,33 @@ const TIME_SLOTS = [
   { start: '13:25', end: '14:15', label: '1:25 - 2:15' },
   { start: '14:15', end: '15:05', label: '2:15 - 3:05' },
   { start: '15:05', end: '15:55', label: '3:05 - 3:55' },
+];
+
+// Academic taxonomy
+const DEPARTMENTS = [
+  { value: 'CSE', label: 'Computer Science & Engineering' },
+  { value: 'AI&DS', label: 'AI & Data Science' },
+  { value: 'EEE', label: 'Electrical & Electronics Engineering' },
+  { value: 'ECE', label: 'Electronics & Communication Engineering' },
+  { value: 'MECH', label: 'Mechanical Engineering' },
+];
+
+const YEARS = [
+  { value: 'I', label: 'I Year' },
+  { value: 'II', label: 'II Year' },
+  { value: 'III', label: 'III Year' },
+  { value: 'IV', label: 'IV Year' },
+];
+
+const SEMESTERS = [
+  { value: '1-1', label: '1st Semester' },
+  { value: '1-2', label: '2nd Semester' },
+  { value: '2-1', label: '3rd Semester' },
+  { value: '2-2', label: '4th Semester' },
+  { value: '3-1', label: '5th Semester' },
+  { value: '3-2', label: '6th Semester' },
+  { value: '4-1', label: '7th Semester' },
+  { value: '4-2', label: '8th Semester' },
 ];
 
 const subjectColors: Record<string, string> = {
@@ -44,9 +74,27 @@ const getAbbreviation = (name?: string): string => {
   return words.map(w => w[0]).join('').toUpperCase().substring(0, 4);
 };
 
+// Get full department name
+const getDepartmentFullName = (code: string): string => {
+  const dept = DEPARTMENTS.find(d => d.value === code);
+  return dept ? `DEPARTMENT OF ${dept.label.toUpperCase()}` : 'DEPARTMENT';
+};
+
+// Get semester display text
+const getSemesterDisplay = (year: string, semester: string): string => {
+  const yearLabel = YEARS.find(y => y.value === year)?.label || year;
+  const semLabel = SEMESTERS.find(s => s.value === semester)?.label || semester;
+  return `${yearLabel} ${semLabel}`;
+};
+
 export default function Timetable() {
   const { user, userRole } = useAuth();
   const isTeacherOrAdmin = userRole === 'teacher' || userRole === 'admin';
+  
+  // Filter states
+  const [selectedDepartment, setSelectedDepartment] = useState('CSE');
+  const [selectedYear, setSelectedYear] = useState('III');
+  const [selectedSemester, setSelectedSemester] = useState('3-2');
   
   const { data: timetableData, isLoading } = useTimetable(user?.id);
 
@@ -73,7 +121,7 @@ export default function Timetable() {
         name: courseName,
         code: courseCode || getAbbreviation(courseName),
         faculty: facultyName || 'TBA',
-        phone: undefined, // Phone not available in current schema
+        phone: undefined,
       });
     }
   });
@@ -124,6 +172,13 @@ export default function Timetable() {
                 getScheduleForSlot={getScheduleForSlot}
                 getSubjectColor={getSubjectColor}
                 subjectFacultyMap={subjectFacultyMap}
+                selectedDepartment={selectedDepartment}
+                setSelectedDepartment={setSelectedDepartment}
+                selectedYear={selectedYear}
+                setSelectedYear={setSelectedYear}
+                selectedSemester={selectedSemester}
+                setSelectedSemester={setSelectedSemester}
+                isAdmin={true}
               />
             </TabsContent>
 
@@ -141,6 +196,13 @@ export default function Timetable() {
             getScheduleForSlot={getScheduleForSlot}
             getSubjectColor={getSubjectColor}
             subjectFacultyMap={subjectFacultyMap}
+            selectedDepartment={selectedDepartment}
+            setSelectedDepartment={setSelectedDepartment}
+            selectedYear={selectedYear}
+            setSelectedYear={setSelectedYear}
+            selectedSemester={selectedSemester}
+            setSelectedSemester={setSelectedSemester}
+            isAdmin={false}
           />
         )}
       </div>
@@ -153,26 +215,106 @@ interface TimetableViewProps {
   getScheduleForSlot: (day: string, slot: typeof TIME_SLOTS[0]) => any;
   getSubjectColor: (courseName?: string) => string;
   subjectFacultyMap: Map<string, { name: string; code: string; faculty: string; phone?: string }>;
+  selectedDepartment: string;
+  setSelectedDepartment: (value: string) => void;
+  selectedYear: string;
+  setSelectedYear: (value: string) => void;
+  selectedSemester: string;
+  setSelectedSemester: (value: string) => void;
+  isAdmin: boolean;
 }
 
 function TimetableView({ 
   timetableData, 
   getScheduleForSlot, 
   getSubjectColor, 
-  subjectFacultyMap 
+  subjectFacultyMap,
+  selectedDepartment,
+  setSelectedDepartment,
+  selectedYear,
+  setSelectedYear,
+  selectedSemester,
+  setSelectedSemester,
+  isAdmin,
 }: TimetableViewProps) {
   const handleExportPdf = () => {
     if (!timetableData) return;
     generateTimetablePdf({
       timetableData,
-      departmentName: 'DEPARTMENT OF COMPUTER SCIENCE & ENGINEERING',
+      departmentName: getDepartmentFullName(selectedDepartment),
       academicYear: '2025-2026',
-      semester: 'III YEAR II SEMESTER',
+      semester: getSemesterDisplay(selectedYear, selectedSemester),
     });
   };
 
   return (
     <>
+      {/* Filter Controls - Admin Only */}
+      {isAdmin && (
+        <Card className="shadow-card">
+          <CardContent className="pt-6">
+            <div className="grid gap-4 sm:grid-cols-3">
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <Building2 className="h-4 w-4" />
+                  Branch / Department
+                </Label>
+                <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select branch" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {DEPARTMENTS.map(dept => (
+                      <SelectItem key={dept.value} value={dept.value}>
+                        {dept.value} - {dept.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <GraduationCap className="h-4 w-4" />
+                  Year
+                </Label>
+                <Select value={selectedYear} onValueChange={setSelectedYear}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select year" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {YEARS.map(year => (
+                      <SelectItem key={year.value} value={year.value}>
+                        {year.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <BookOpen className="h-4 w-4" />
+                  Semester
+                </Label>
+                <Select value={selectedSemester} onValueChange={setSelectedSemester}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select semester" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SEMESTERS.map(sem => (
+                      <SelectItem key={sem.value} value={sem.value}>
+                        {sem.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* College Header */}
       <Card className="shadow-card border-2 border-primary/20">
         <CardHeader className="text-center pb-2">
@@ -180,10 +322,10 @@ function TimetableView({
             <GraduationCap className="h-8 w-8 text-primary" />
             <div>
               <CardTitle className="text-xl font-display text-primary">
-                DEPARTMENT OF COMPUTER SCIENCE & ENGINEERING
+                {getDepartmentFullName(selectedDepartment)}
               </CardTitle>
               <p className="text-sm text-muted-foreground">
-                III YEAR II SEMESTER TIME TABLE | A.Y: 2025-2026
+                {getSemesterDisplay(selectedYear, selectedSemester)} TIME TABLE | A.Y: 2025-2026
               </p>
             </div>
           </div>
