@@ -8,6 +8,8 @@ import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { toast } from 'sonner';
 import { 
   Calendar, 
@@ -18,62 +20,41 @@ import {
   AlertCircle,
   Trash2,
   RefreshCw,
-  FlaskConical
+  FlaskConical,
+  Users,
+  BookOpen,
+  Info
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import {
+  DAYS,
+  TIME_SLOTS,
+  CLASS_SLOTS,
+  ROOMS,
+  LABS,
+  generateOptimizedTimetable,
+  getAbbreviation,
+  type SelectedClass,
+  type GeneratedSlot,
+  type FacultyWorkload,
+  type DayOfWeek,
+} from '@/lib/timetableScheduler';
 
-const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-
-// Exact time slots matching the reference timetable
-const TIME_SLOTS = [
-  { start: '09:15', end: '10:05', label: '9:15 - 10:05', index: 0 },
-  { start: '10:05', end: '10:55', label: '10:05 - 10:55', index: 1 },
-  { start: '11:05', end: '11:55', label: '11:05 - 11:55', index: 2 },
-  { start: '11:55', end: '12:45', label: '11:55 - 12:45', index: 3 },
-  { start: '12:45', end: '13:25', label: '12:45 - 1:25', isLunch: true, index: 4 },
-  { start: '13:25', end: '14:15', label: '1:25 - 2:15', index: 5 },
-  { start: '14:15', end: '15:05', label: '2:15 - 3:05', index: 6 },
-  { start: '15:05', end: '15:55', label: '3:05 - 3:55', index: 7 },
-];
-
-// Regular class slots (excluding lunch)
-const CLASS_SLOTS = TIME_SLOTS.filter(s => !s.isLunch);
-
-const ROOMS = ['Room 101', 'Room 102', 'Room 103', 'Room 201', 'Room 202', 'Room 203'];
-const LABS = ['Lab 1', 'Lab 2', 'Lab 3', 'Lab 4'];
-
-interface GeneratedSlot {
-  class_id: string;
-  day_of_week: string;
-  start_time: string;
-  end_time: string;
-  room: string;
-  courseName: string;
-  section: string;
-  isLab?: boolean;
-}
-
-interface SelectedClass {
+interface LocalSelectedClass {
   id: string;
   isLab: boolean;
   classesPerWeek: number;
 }
-
-// Get abbreviation from course name
-const getAbbreviation = (name?: string): string => {
-  if (!name) return '---';
-  const words = name.split(' ').filter(w => w.length > 2 && !['and', 'the', 'for', 'with'].includes(w.toLowerCase()));
-  if (words.length === 1) return words[0].substring(0, 3).toUpperCase();
-  return words.map(w => w[0]).join('').toUpperCase().substring(0, 4);
-};
 
 export default function TimetableGenerator() {
   const { data: classes, isLoading: classesLoading } = useClasses();
   const { data: existingTimetable, isLoading: timetableLoading } = useTimetable();
   const queryClient = useQueryClient();
 
-  const [selectedClasses, setSelectedClasses] = useState<Map<string, SelectedClass>>(new Map());
+  const [selectedClasses, setSelectedClasses] = useState<Map<string, LocalSelectedClass>>(new Map());
   const [generatedSchedule, setGeneratedSchedule] = useState<GeneratedSlot[]>([]);
+  const [facultyWorkloads, setFacultyWorkloads] = useState<FacultyWorkload[]>([]);
+  const [justification, setJustification] = useState<string[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -131,6 +112,8 @@ export default function TimetableGenerator() {
   const clearSelection = () => {
     setSelectedClasses(new Map());
     setGeneratedSchedule([]);
+    setFacultyWorkloads([]);
+    setJustification([]);
   };
 
   const generateTimetable = () => {
@@ -142,142 +125,41 @@ export default function TimetableGenerator() {
     setIsGenerating(true);
     
     setTimeout(() => {
-      const schedule: GeneratedSlot[] = [];
-      // Track used slots: day -> slot index -> true if occupied
-      const usedSlots = new Map<string, Set<number>>();
+      // Convert local selection to SelectedClass format with class data
+      const selectedWithData: SelectedClass[] = [];
       
-      // Initialize used slots map
-      DAYS.forEach(day => usedSlots.set(day, new Set()));
-      
-      // Mark existing timetable slots as used
-      existingTimetable?.forEach(entry => {
-        const daySlots = usedSlots.get(entry.day_of_week);
-        if (daySlots) {
-          const slotIndex = TIME_SLOTS.findIndex(s => s.start === entry.start_time.substring(0, 5));
-          if (slotIndex !== -1) {
-            daySlots.add(slotIndex);
-          }
-        }
-      });
-
-      // Mark lunch slot as always used
-      DAYS.forEach(day => {
-        const lunchSlot = TIME_SLOTS.find(s => s.isLunch);
-        if (lunchSlot) {
-          usedSlots.get(day)?.add(lunchSlot.index);
-        }
-      });
-
-      // Separate labs and subjects
-      const labs: Array<SelectedClass & { classData: any }> = [];
-      const subjects: Array<SelectedClass & { classData: any }> = [];
-
-      selectedClasses.forEach((selection, key) => {
+      selectedClasses.forEach((selection, _key) => {
         const classData = classes?.find(c => c.id === selection.id);
         if (classData) {
-          if (selection.isLab) {
-            labs.push({ ...selection, classData });
-          } else {
-            subjects.push({ ...selection, classData });
-          }
+          selectedWithData.push({
+            ...selection,
+            classData: {
+              id: classData.id,
+              teacher_id: classData.teacher_id,
+              section: classData.section,
+              courses: classData.courses,
+              profiles: classData.profiles as { full_name?: string },
+            },
+          });
         }
       });
 
-      // First, schedule labs (they need 2 consecutive periods)
-      labs.forEach(lab => {
-        const courseName = lab.classData.courses?.name || 'Unknown Course';
-        const section = lab.classData.section || 'A';
-        let assignedCount = 0;
+      const result = generateOptimizedTimetable(
+        selectedWithData,
+        existingTimetable || []
+      );
 
-        // Shuffle days for randomness
-        const shuffledDays = [...DAYS].sort(() => Math.random() - 0.5);
-
-        for (const day of shuffledDays) {
-          if (assignedCount >= lab.classesPerWeek) break;
-
-          const daySlots = usedSlots.get(day)!;
-          
-          // Find 2 consecutive available slots (not crossing lunch)
-          // Morning slots: 0-3, Afternoon slots: 5-7
-          const morningPairs = [[0, 1], [1, 2], [2, 3]];
-          const afternoonPairs = [[5, 6], [6, 7]];
-          const allPairs = [...morningPairs, ...afternoonPairs].sort(() => Math.random() - 0.5);
-
-          for (const [slot1, slot2] of allPairs) {
-            if (!daySlots.has(slot1) && !daySlots.has(slot2)) {
-              const room = LABS[Math.floor(Math.random() * LABS.length)];
-              
-              schedule.push({
-                class_id: lab.id,
-                day_of_week: day,
-                start_time: TIME_SLOTS[slot1].start,
-                end_time: TIME_SLOTS[slot2].end,
-                room,
-                courseName: `${courseName} LAB`,
-                section,
-                isLab: true,
-              });
-
-              daySlots.add(slot1);
-              daySlots.add(slot2);
-              assignedCount++;
-              break;
-            }
-          }
-        }
-      });
-
-      // Then, schedule regular subjects (single periods)
-      subjects.forEach(subject => {
-        const courseName = subject.classData.courses?.name || 'Unknown Course';
-        const section = subject.classData.section || 'A';
-        let assignedCount = 0;
-
-        const shuffledDays = [...DAYS].sort(() => Math.random() - 0.5);
-
-        for (const day of shuffledDays) {
-          if (assignedCount >= subject.classesPerWeek) break;
-
-          const daySlots = usedSlots.get(day)!;
-          
-          // Get available single slot indices (excluding lunch)
-          const availableSlots = CLASS_SLOTS
-            .map(s => s.index)
-            .filter(idx => !daySlots.has(idx))
-            .sort(() => Math.random() - 0.5);
-
-          for (const slotIdx of availableSlots) {
-            if (assignedCount >= subject.classesPerWeek) break;
-            
-            const slot = TIME_SLOTS[slotIdx];
-            const room = ROOMS[Math.floor(Math.random() * ROOMS.length)];
-            
-            schedule.push({
-              class_id: subject.id,
-              day_of_week: day,
-              start_time: slot.start,
-              end_time: slot.end,
-              room,
-              courseName,
-              section,
-              isLab: false,
-            });
-
-            daySlots.add(slotIdx);
-            assignedCount++;
-          }
-        }
-      });
-
-      setGeneratedSchedule(schedule);
+      setGeneratedSchedule(result.schedule);
+      setFacultyWorkloads(result.facultyWorkloads);
+      setJustification(result.justification);
       setIsGenerating(false);
       
-      if (schedule.length > 0) {
-        toast.success(`Generated ${schedule.length} time slots`);
+      if (result.schedule.length > 0) {
+        toast.success(`Generated ${result.schedule.length} time slots with faculty-optimized scheduling`);
       } else {
         toast.warning('Could not generate any slots. All time slots may be occupied.');
       }
-    }, 1000);
+    }, 1500);
   };
 
   const saveGeneratedTimetable = async () => {
@@ -305,6 +187,8 @@ export default function TimetableGenerator() {
 
       toast.success(`Saved ${generatedSchedule.length} timetable entries`);
       setGeneratedSchedule([]);
+      setFacultyWorkloads([]);
+      setJustification([]);
       setSelectedClasses(new Map());
       queryClient.invalidateQueries({ queryKey: ['timetable'] });
     } catch (error: any) {
@@ -343,13 +227,27 @@ export default function TimetableGenerator() {
   // Build preview grid
   const previewGrid = new Map<string, GeneratedSlot>();
   generatedSchedule.forEach(slot => {
-    const slotIndex = TIME_SLOTS.findIndex(s => s.start === slot.start_time);
-    if (slotIndex !== -1) {
-      previewGrid.set(`${slot.day_of_week}-${slotIndex}`, slot);
+    const startSlotIndex = TIME_SLOTS.findIndex(s => s.start === slot.start_time);
+    if (startSlotIndex !== -1) {
+      previewGrid.set(`${slot.day_of_week}-${startSlotIndex}`, slot);
       // If it's a lab, also mark the next slot
-      if (slot.isLab) {
-        previewGrid.set(`${slot.day_of_week}-${slotIndex + 1}`, slot);
+      if (slot.isLab && slot.slotIndices.length > 1) {
+        previewGrid.set(`${slot.day_of_week}-${startSlotIndex + 1}`, slot);
       }
+    }
+  });
+
+  // Build subject-faculty mapping
+  const subjectFacultyMap = new Map<string, { name: string; code: string; faculty: string; isLab: boolean }>();
+  generatedSchedule.forEach(slot => {
+    const key = `${slot.courseCode}-${slot.isLab ? 'lab' : 'theory'}`;
+    if (!subjectFacultyMap.has(key)) {
+      subjectFacultyMap.set(key, {
+        name: slot.courseName,
+        code: slot.courseCode,
+        faculty: slot.facultyName,
+        isLab: slot.isLab,
+      });
     }
   });
 
@@ -372,10 +270,17 @@ export default function TimetableGenerator() {
             <div className="p-2 rounded-lg bg-primary/10">
               <Wand2 className="h-5 w-5 text-primary" />
             </div>
-            Automatic Timetable Generator
+            Faculty-Optimized Timetable Generator
           </CardTitle>
-          <CardDescription>
-            Select subjects and labs, then generate an optimized timetable matching your institution's time slots
+          <CardDescription className="space-y-2">
+            <p>Generate an academic timetable optimized for faculty comfort and efficiency.</p>
+            <div className="flex flex-wrap gap-2 mt-2">
+              <Badge variant="outline" className="text-xs">Max 3 theory/faculty/day</Badge>
+              <Badge variant="outline" className="text-xs">≤2 continuous periods</Badge>
+              <Badge variant="outline" className="text-xs">Labs in afternoon</Badge>
+              <Badge variant="outline" className="text-xs">Core subjects in morning</Badge>
+              <Badge variant="outline" className="text-xs">Even workload distribution</Badge>
+            </div>
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -444,7 +349,7 @@ export default function TimetableGenerator() {
                         {classItem.courses?.name || 'Unknown Course'}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        {classItem.courses?.code} • Section {classItem.section}
+                        {classItem.courses?.code} • {classItem.profiles?.full_name || 'TBA'}
                       </p>
                       {isSelected && (
                         <div className="mt-2 flex items-center gap-2" onClick={e => e.stopPropagation()}>
@@ -489,7 +394,7 @@ export default function TimetableGenerator() {
             Select Labs
           </CardTitle>
           <CardDescription>
-            Choose labs to include (each lab takes 2 consecutive periods)
+            Choose labs to include (each lab takes 2 consecutive periods, preferably afternoon)
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -574,13 +479,13 @@ export default function TimetableGenerator() {
           ) : (
             <>
               <Wand2 className="h-5 w-5 mr-2" />
-              Generate Timetable
+              Generate Optimized Timetable
             </>
           )}
         </Button>
       </div>
 
-      {/* Generated Schedule Preview - Grid Format */}
+      {/* Generated Schedule Preview */}
       {generatedSchedule.length > 0 && (
         <Card className="shadow-card border-success/20 bg-success/5">
           <CardHeader>
@@ -591,7 +496,7 @@ export default function TimetableGenerator() {
                   Generated Schedule Preview
                 </CardTitle>
                 <CardDescription>
-                  Review and save the generated timetable ({generatedSchedule.length} entries)
+                  Review the faculty-optimized timetable ({generatedSchedule.length} entries)
                 </CardDescription>
               </div>
               <div className="flex gap-2">
@@ -616,157 +521,50 @@ export default function TimetableGenerator() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[900px] border-collapse">
-                <thead>
-                  <tr className="bg-primary text-primary-foreground">
-                    <th className="p-2 text-center font-bold border border-primary-foreground/20 w-24">
-                      DAY/TIME
-                    </th>
-                    {TIME_SLOTS.map((slot, idx) => (
-                      <th 
-                        key={idx} 
-                        className={cn(
-                          "p-2 text-center font-semibold text-xs border border-primary-foreground/20",
-                          slot.isLunch && "bg-amber-500"
-                        )}
-                      >
-                        {slot.isLunch ? 'LUNCH' : slot.label}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {DAYS.map((day, dayIndex) => {
-                    const renderedSlots = new Set<number>();
-                    
-                    return (
-                      <tr key={day} className={dayIndex % 2 === 0 ? 'bg-background' : 'bg-muted/30'}>
-                        <td className="p-2 font-bold text-sm text-center border bg-muted/50 uppercase">
-                          {day}
-                        </td>
-                        {TIME_SLOTS.map((slot, slotIndex) => {
-                          if (renderedSlots.has(slotIndex)) return null;
-                          
-                          if (slot.isLunch) {
-                            return (
-                              <td 
-                                key={slotIndex} 
-                                className="p-2 text-center border bg-amber-50 dark:bg-amber-900/20"
-                              >
-                                <span className="text-amber-600 dark:text-amber-400 font-medium text-xs">
-                                  🍽️ BREAK
-                                </span>
-                              </td>
-                            );
-                          }
-                          
-                          const cellKey = `${day}-${slotIndex}`;
-                          const entry = previewGrid.get(cellKey);
-                          
-                          if (entry) {
-                            // Check if this is a lab that spans 2 periods
-                            if (entry.isLab && entry.start_time === slot.start) {
-                              renderedSlots.add(slotIndex + 1);
-                              return (
-                                <td 
-                                  key={slotIndex} 
-                                  colSpan={2}
-                                  className="p-2 text-center border bg-purple-100 dark:bg-purple-900/30 min-w-[80px]"
-                                >
-                                  <div className="flex flex-col items-center gap-0.5">
-                                    <span className="font-bold text-sm text-purple-800 dark:text-purple-200">
-                                      {getAbbreviation(entry.courseName.replace(' LAB', ''))} LAB
-                                    </span>
-                                    <span className="text-[10px] text-purple-600 dark:text-purple-300">
-                                      {entry.room}
-                                    </span>
-                                  </div>
-                                </td>
-                              );
-                            } else if (!entry.isLab) {
-                              return (
-                                <td 
-                                  key={slotIndex} 
-                                  className="p-2 text-center border bg-blue-100 dark:bg-blue-900/30 min-w-[80px]"
-                                >
-                                  <div className="flex flex-col items-center gap-0.5">
-                                    <span className="font-bold text-sm text-blue-800 dark:text-blue-200">
-                                      {getAbbreviation(entry.courseName)}
-                                    </span>
-                                    <span className="text-[10px] text-blue-600 dark:text-blue-300">
-                                      {entry.room}
-                                    </span>
-                                  </div>
-                                </td>
-                              );
-                            }
-                            return null;
-                          }
-                          
-                          return (
-                            <td 
-                              key={slotIndex} 
-                              className="p-2 text-center border min-w-[80px]"
-                            />
-                          );
-                        })}
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+            <Tabs defaultValue="grid" className="space-y-4">
+              <TabsList className="grid w-full max-w-md grid-cols-4">
+                <TabsTrigger value="grid" className="flex items-center gap-1">
+                  <Calendar className="h-4 w-4" />
+                  Grid
+                </TabsTrigger>
+                <TabsTrigger value="faculty" className="flex items-center gap-1">
+                  <Users className="h-4 w-4" />
+                  Faculty
+                </TabsTrigger>
+                <TabsTrigger value="subjects" className="flex items-center gap-1">
+                  <BookOpen className="h-4 w-4" />
+                  Subjects
+                </TabsTrigger>
+                <TabsTrigger value="justification" className="flex items-center gap-1">
+                  <Info className="h-4 w-4" />
+                  Info
+                </TabsTrigger>
+              </TabsList>
 
-            {/* List view for details */}
-            <div className="mt-6">
-              <h4 className="font-semibold mb-3">Detailed List:</h4>
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[700px]">
-                  <thead>
-                    <tr className="border-b">
-                      <th className="text-left p-3 font-medium">Course</th>
-                      <th className="text-left p-3 font-medium">Type</th>
-                      <th className="text-left p-3 font-medium">Day</th>
-                      <th className="text-left p-3 font-medium">Time</th>
-                      <th className="text-left p-3 font-medium">Room</th>
-                      <th className="text-right p-3 font-medium">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {generatedSchedule.map((slot, index) => (
-                      <tr key={index} className="border-b last:border-0 hover:bg-muted/50">
-                        <td className="p-3 font-medium">{slot.courseName}</td>
-                        <td className="p-3">
-                          <Badge variant={slot.isLab ? "secondary" : "outline"} 
-                            className={slot.isLab ? "bg-purple-100 text-purple-800" : ""}>
-                            {slot.isLab ? 'Lab' : 'Theory'}
-                          </Badge>
-                        </td>
-                        <td className="p-3">{slot.day_of_week}</td>
-                        <td className="p-3">
-                          <div className="flex items-center gap-1">
-                            <Clock className="h-4 w-4 text-muted-foreground" />
-                            {slot.start_time} - {slot.end_time}
-                          </div>
-                        </td>
-                        <td className="p-3">{slot.room}</td>
-                        <td className="p-3 text-right">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => removeSlot(index)}
-                            className="text-destructive hover:text-destructive"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+              {/* Grid View */}
+              <TabsContent value="grid">
+                <TimetableGrid 
+                  previewGrid={previewGrid} 
+                  removeSlot={removeSlot}
+                  generatedSchedule={generatedSchedule}
+                />
+              </TabsContent>
+
+              {/* Faculty Workload View */}
+              <TabsContent value="faculty">
+                <FacultyWorkloadView workloads={facultyWorkloads} />
+              </TabsContent>
+
+              {/* Subject-Faculty Mapping */}
+              <TabsContent value="subjects">
+                <SubjectFacultyMapping mapping={subjectFacultyMap} />
+              </TabsContent>
+
+              {/* Justification */}
+              <TabsContent value="justification">
+                <JustificationView justification={justification} />
+              </TabsContent>
+            </Tabs>
           </CardContent>
         </Card>
       )}
@@ -800,5 +598,369 @@ export default function TimetableGenerator() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+// Timetable Grid Component
+function TimetableGrid({ 
+  previewGrid, 
+  removeSlot,
+  generatedSchedule 
+}: { 
+  previewGrid: Map<string, GeneratedSlot>;
+  removeSlot: (index: number) => void;
+  generatedSchedule: GeneratedSlot[];
+}) {
+  return (
+    <div className="space-y-6">
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[900px] border-collapse">
+          <thead>
+            <tr className="bg-primary text-primary-foreground">
+              <th className="p-2 text-center font-bold border border-primary-foreground/20 w-24">
+                DAY/TIME
+              </th>
+              {TIME_SLOTS.map((slot, idx) => (
+                <th 
+                  key={idx} 
+                  className={cn(
+                    "p-2 text-center font-semibold text-xs border border-primary-foreground/20",
+                    slot.isLunch && "bg-amber-500"
+                  )}
+                >
+                  {slot.isLunch ? 'LUNCH' : slot.label}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {DAYS.map((day, dayIndex) => {
+              const renderedSlots = new Set<number>();
+              
+              return (
+                <tr key={day} className={dayIndex % 2 === 0 ? 'bg-background' : 'bg-muted/30'}>
+                  <td className="p-2 font-bold text-sm text-center border bg-muted/50 uppercase">
+                    {day}
+                  </td>
+                  {TIME_SLOTS.map((slot, slotIndex) => {
+                    if (renderedSlots.has(slotIndex)) return null;
+                    
+                    if (slot.isLunch) {
+                      return (
+                        <td 
+                          key={slotIndex} 
+                          className="p-2 text-center border bg-amber-50 dark:bg-amber-900/20"
+                        >
+                          <span className="text-amber-600 dark:text-amber-400 font-medium text-xs">
+                            🍽️ BREAK
+                          </span>
+                        </td>
+                      );
+                    }
+                    
+                    const cellKey = `${day}-${slotIndex}`;
+                    const entry = previewGrid.get(cellKey);
+                    
+                    if (entry) {
+                      if (entry.isLab && entry.start_time === slot.start) {
+                        renderedSlots.add(slotIndex + 1);
+                        return (
+                          <td 
+                            key={slotIndex} 
+                            colSpan={2}
+                            className="p-2 text-center border bg-purple-100 dark:bg-purple-900/30 min-w-[80px]"
+                          >
+                            <div className="flex flex-col items-center gap-0.5">
+                              <span className="font-bold text-sm text-purple-800 dark:text-purple-200">
+                                {entry.courseCode}
+                              </span>
+                              <span className="text-[10px] text-purple-600 dark:text-purple-300">
+                                {entry.room}
+                              </span>
+                            </div>
+                          </td>
+                        );
+                      } else if (!entry.isLab) {
+                        return (
+                          <td 
+                            key={slotIndex} 
+                            className="p-2 text-center border bg-blue-100 dark:bg-blue-900/30 min-w-[80px]"
+                          >
+                            <div className="flex flex-col items-center gap-0.5">
+                              <span className="font-bold text-sm text-blue-800 dark:text-blue-200">
+                                {entry.courseCode}
+                              </span>
+                              <span className="text-[10px] text-blue-600 dark:text-blue-300">
+                                {entry.room}
+                              </span>
+                            </div>
+                          </td>
+                        );
+                      }
+                      return null;
+                    }
+                    
+                    return (
+                      <td 
+                        key={slotIndex} 
+                        className="p-2 text-center border min-w-[80px]"
+                      />
+                    );
+                  })}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Detailed List */}
+      <div>
+        <h4 className="font-semibold mb-3">Detailed List:</h4>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[700px]">
+            <thead>
+              <tr className="border-b">
+                <th className="text-left p-3 font-medium">Course</th>
+                <th className="text-left p-3 font-medium">Faculty</th>
+                <th className="text-left p-3 font-medium">Type</th>
+                <th className="text-left p-3 font-medium">Day</th>
+                <th className="text-left p-3 font-medium">Time</th>
+                <th className="text-left p-3 font-medium">Room</th>
+                <th className="text-right p-3 font-medium">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {generatedSchedule.map((slot, index) => (
+                <tr key={index} className="border-b last:border-0 hover:bg-muted/50">
+                  <td className="p-3 font-medium">{slot.courseName}</td>
+                  <td className="p-3 text-muted-foreground">{slot.facultyName}</td>
+                  <td className="p-3">
+                    <Badge variant={slot.isLab ? "secondary" : "outline"} 
+                      className={slot.isLab ? "bg-purple-100 text-purple-800" : ""}>
+                      {slot.isLab ? 'Lab' : 'Theory'}
+                    </Badge>
+                  </td>
+                  <td className="p-3">{slot.day_of_week}</td>
+                  <td className="p-3">
+                    <div className="flex items-center gap-1">
+                      <Clock className="h-4 w-4 text-muted-foreground" />
+                      {slot.start_time} - {slot.end_time}
+                    </div>
+                  </td>
+                  <td className="p-3">{slot.room}</td>
+                  <td className="p-3 text-right">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => removeSlot(index)}
+                      className="text-destructive hover:text-destructive"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Faculty Workload View Component
+function FacultyWorkloadView({ workloads }: { workloads: FacultyWorkload[] }) {
+  return (
+    <div className="space-y-6">
+      {workloads.length === 0 ? (
+        <div className="text-center py-8 text-muted-foreground">
+          <Users className="h-12 w-12 mx-auto mb-3 opacity-30" />
+          <p>No faculty workload data available</p>
+        </div>
+      ) : (
+        <>
+          {/* Summary Table */}
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-muted/50">
+                  <TableHead className="font-bold">Faculty</TableHead>
+                  <TableHead className="font-bold text-center">Total Periods</TableHead>
+                  <TableHead className="font-bold text-center">Morning</TableHead>
+                  <TableHead className="font-bold text-center">Afternoon</TableHead>
+                  {DAYS.map(day => (
+                    <TableHead key={day} className="font-bold text-center text-xs">
+                      {day.substring(0, 3)}
+                    </TableHead>
+                  ))}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {workloads.map((workload, idx) => (
+                  <TableRow key={idx}>
+                    <TableCell className="font-medium">{workload.teacherName}</TableCell>
+                    <TableCell className="text-center">
+                      <Badge variant="secondary">{workload.totalPeriods}</Badge>
+                    </TableCell>
+                    <TableCell className="text-center text-sm">{workload.morningPeriods}</TableCell>
+                    <TableCell className="text-center text-sm">{workload.afternoonPeriods}</TableCell>
+                    {DAYS.map(day => (
+                      <TableCell key={day} className="text-center text-sm">
+                        {workload.periodsPerDay.get(day as DayOfWeek) || 0}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+
+          {/* Individual Faculty Timetables */}
+          <div className="space-y-4">
+            <h4 className="font-semibold">Individual Faculty Schedules:</h4>
+            {workloads.map((workload, idx) => (
+              <Card key={idx} className="shadow-sm">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Users className="h-4 w-4 text-primary" />
+                    {workload.teacherName}
+                    <Badge variant="outline" className="ml-auto">
+                      {workload.totalPeriods} periods/week
+                    </Badge>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm border-collapse">
+                      <thead>
+                        <tr className="bg-muted/50">
+                          <th className="p-2 text-left font-medium border">Day</th>
+                          <th className="p-2 text-left font-medium border">Schedule</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {DAYS.map(day => {
+                          const daySchedule = workload.daySchedule.get(day as DayOfWeek) || [];
+                          return (
+                            <tr key={day}>
+                              <td className="p-2 border font-medium w-24">{day}</td>
+                              <td className="p-2 border">
+                                {daySchedule.length > 0 ? (
+                                  <div className="flex flex-wrap gap-2">
+                                    {daySchedule.map((slot, i) => (
+                                      <Badge
+                                        key={i}
+                                        variant={slot.isLab ? "secondary" : "outline"}
+                                        className={cn(
+                                          "text-xs",
+                                          slot.isLab && "bg-purple-100 text-purple-800"
+                                        )}
+                                      >
+                                        {slot.courseCode} ({slot.start_time}-{slot.end_time})
+                                      </Badge>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <span className="text-muted-foreground text-xs">Free</span>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// Subject-Faculty Mapping Component
+function SubjectFacultyMapping({ 
+  mapping 
+}: { 
+  mapping: Map<string, { name: string; code: string; faculty: string; isLab: boolean }> 
+}) {
+  return (
+    <div className="overflow-x-auto">
+      <Table>
+        <TableHeader>
+          <TableRow className="bg-muted/50">
+            <TableHead className="font-bold">Subject Code</TableHead>
+            <TableHead className="font-bold">Subject Name</TableHead>
+            <TableHead className="font-bold">Type</TableHead>
+            <TableHead className="font-bold">Faculty</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {Array.from(mapping.values()).map((subject, idx) => (
+            <TableRow key={idx}>
+              <TableCell>
+                <Badge 
+                  variant="outline" 
+                  className={cn(
+                    "font-mono",
+                    subject.isLab ? "bg-purple-100 text-purple-800" : "bg-blue-100 text-blue-800"
+                  )}
+                >
+                  {subject.code}
+                </Badge>
+              </TableCell>
+              <TableCell className="font-medium">{subject.name}</TableCell>
+              <TableCell>
+                <Badge variant={subject.isLab ? "secondary" : "outline"}>
+                  {subject.isLab ? 'Lab' : 'Theory'}
+                </Badge>
+              </TableCell>
+              <TableCell>{subject.faculty}</TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
+  );
+}
+
+// Justification View Component
+function JustificationView({ justification }: { justification: string[] }) {
+  return (
+    <Card className="shadow-sm">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-base flex items-center gap-2">
+          <Info className="h-4 w-4 text-primary" />
+          How Faculty Comfort is Ensured
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <ul className="space-y-2">
+          {justification.map((item, idx) => (
+            <li key={idx} className="flex items-start gap-2 text-sm">
+              <span className="shrink-0">{item}</span>
+            </li>
+          ))}
+        </ul>
+        
+        <div className="mt-6 p-4 bg-muted/50 rounded-lg">
+          <h5 className="font-semibold mb-2">Applied Constraints:</h5>
+          <ul className="text-sm space-y-1 text-muted-foreground">
+            <li>• Maximum 3 theory periods per faculty per day</li>
+            <li>• No more than 2 continuous theory periods</li>
+            <li>• At least 1 free period per faculty per day</li>
+            <li>• Workload distributed evenly across the week</li>
+            <li>• Labs scheduled in 2 consecutive periods (afternoon preferred)</li>
+            <li>• No theory classes immediately before/after lab sessions</li>
+            <li>• Core/heavy subjects scheduled in morning sessions</li>
+            <li>• Seminar, soft skills on Friday/Saturday</li>
+            <li>• Lunch break fixed at 12:45 PM - 1:25 PM</li>
+          </ul>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
