@@ -178,21 +178,21 @@ export default function ExamSchedule() {
         <Card>
           <CardContent className="pt-6">
             <div className="flex flex-wrap gap-4">
-              <Select value={department} onValueChange={setDepartment}>
+              <Select value={department || "all"} onValueChange={(v) => setDepartment(v === "all" ? "" : v)}>
                 <SelectTrigger className="w-[180px]">
                   <SelectValue placeholder="All Departments" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Departments</SelectItem>
+                  <SelectItem value="all">All Departments</SelectItem>
                   {DEPARTMENTS.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
                 </SelectContent>
               </Select>
-              <Select value={semester} onValueChange={setSemester}>
+              <Select value={semester || "all"} onValueChange={(v) => setSemester(v === "all" ? "" : v)}>
                 <SelectTrigger className="w-[180px]">
                   <SelectValue placeholder="All Semesters" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Semesters</SelectItem>
+                  <SelectItem value="all">All Semesters</SelectItem>
                   {SEMESTERS.map(s => <SelectItem key={s} value={s}>Semester {s}</SelectItem>)}
                 </SelectContent>
               </Select>
